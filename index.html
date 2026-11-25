@@ -339,6 +339,29 @@ function viewFunil(){
   const w=EL('div');
   const t=pageHead('Funil'); const add=EL('button','btn','+ Novo lead'); add.style.marginLeft='auto';
   add.onclick=()=>openLead(null); t.appendChild(add); w.appendChild(t);
+  // busca rápida de cliente (pra reagendar sem caçar o card)
+  const sbx=EL('div'); sbx.style.cssText='position:relative;margin-top:6px;max-width:380px';
+  const si=document.createElement('input'); si.type='text'; si.placeholder='🔍 Buscar cliente por nome ou telefone…';
+  si.style.cssText='width:100%;padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--surface);color:var(--ink)';
+  const results=EL('div'); results.style.cssText='position:absolute;left:0;right:0;top:48px;background:var(--surface);border:1px solid var(--line2);border-radius:10px;box-shadow:var(--shadow);z-index:30;overflow:hidden;display:none;max-height:320px;overflow-y:auto';
+  si.oninput=()=>{
+    const q=si.value.trim().toLowerCase(); results.innerHTML='';
+    if(!q){results.style.display='none';return;}
+    const key=q.replace(/\D/g,'');
+    const matches=S.leads.filter(l=>(l.nome||'').toLowerCase().includes(q)||(key&&(l.telefone||'').replace(/\D/g,'').includes(key))).slice(0,10);
+    if(!matches.length){results.style.display='block';results.appendChild(Object.assign(EL('div','muted'),{textContent:'Nenhuma cliente com esse nome',style:'padding:11px 12px;font-size:13px'}));return;}
+    matches.forEach(l=>{
+      const r=EL('div'); r.style.cssText='padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line)';
+      r.onmouseenter=()=>r.style.background='var(--goldsoft)'; r.onmouseleave=()=>r.style.background='';
+      const servs=servicosDoLead(l.id);
+      r.appendChild(Object.assign(EL('div'),{textContent:l.nome||'—',style:'font-weight:600;font-size:14px'}));
+      r.appendChild(Object.assign(EL('div','muted'),{textContent:[l.telefone,servs.length?servs.length+' serviço(s)':'sem serviço'].filter(Boolean).join(' · '),style:'font-size:12px'}));
+      r.onclick=()=>openLead(l.id);
+      results.appendChild(r);
+    });
+    results.style.display='block';
+  };
+  sbx.appendChild(si); sbx.appendChild(results); w.appendChild(sbx);
   // stats
   const ks=EL('div','kstats');
   const atr=S.leads.filter(l=>leadAlert(l)).length;
