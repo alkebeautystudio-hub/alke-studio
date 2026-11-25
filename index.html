@@ -30,7 +30,7 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;-webkit-font-smoothing:antialiased}
+body{background:radial-gradient(1100px 640px at 50% -240px, var(--surface), var(--bg) 62%) fixed;color:var(--ink);font-family:var(--body);font-size:14px;-webkit-font-smoothing:antialiased}
 h1,h2,h3,h4{font-family:var(--disp);font-weight:600;margin:0;letter-spacing:.2px}
 button,input,select,textarea{font-family:var(--body);font-size:14px}
 button{cursor:pointer}
@@ -254,7 +254,9 @@ function renderShell(){
   who.innerHTML=''; const b=EL('b',null,S.me.nome||'—');
   const r=EL('div','muted',isAdmin()?'Administrador':(S.me.socia?'Sócia':'Profissional'));
   who.appendChild(b); who.appendChild(r);
-  const out=EL('button','btn ghost sm','Sair'); out.style.marginTop='9px';
+  const mc=EL('button','btn ghost sm','Minha conta'); mc.style.cssText='margin-top:9px;width:100%';
+  mc.onclick=minhaConta; who.appendChild(mc);
+  const out=EL('button','btn ghost sm','Sair'); out.style.cssText='margin-top:6px;width:100%';
   out.onclick=async()=>{await sb.auth.signOut();location.reload()};
   who.appendChild(out);
 }
@@ -612,21 +614,73 @@ function aniversariantesPanel(){
 // ---------- EQUIPE (admin) ----------
 function viewEquipe(){
   const w=EL('div'); w.appendChild(pageHead('Equipe'));
-  w.appendChild(EL('p','muted','Cadastre profissionais, defina cor, se é sócia e os serviços dela. Login é criado à parte (me peça pra gerar).'));
-  const pan=EL('div','panel');
+  w.appendChild(EL('p','muted','Cadastre as profissionais, defina cor e papel, e crie o acesso (login) de cada uma.'));
   S.pros.forEach(p=>{
-    const row=EL('div','srow');row.style.gridTemplateColumns='1.4fr .8fr .9fr auto';
-    const nm=document.createElement('input');nm.value=p.nome;nm.onchange=()=>sb.from('profissionais').update({nome:nm.value}).eq('id',p.id);
-    const cor=document.createElement('input');cor.type='color';cor.value=p.cor||'#A8823A';cor.onchange=()=>sb.from('profissionais').update({cor:cor.value}).eq('id',p.id);
+    const pan=EL('div','panel'); pan.style.marginTop='12px';
+    const r1=EL('div','row'); r1.style.gap='9px';
+    const nm=document.createElement('input');nm.value=p.nome;nm.style.cssText='flex:1;min-width:130px;padding:9px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';
+    nm.onchange=()=>sb.from('profissionais').update({nome:nm.value}).eq('id',p.id);
+    const cor=document.createElement('input');cor.type='color';cor.value=p.cor||'#A8823A';cor.style.cssText='width:46px;height:40px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);padding:2px';
+    cor.onchange=()=>sb.from('profissionais').update({cor:cor.value}).eq('id',p.id);
     const papel=sel([['socia','Sócia'],['prof','Profissional'],['admin','Admin']], p.admin?'admin':(p.socia?'socia':'prof'));
+    papel.style.cssText='padding:9px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';
     papel.onchange=()=>sb.from('profissionais').update({admin:papel.value==='admin',socia:papel.value==='socia'}).eq('id',p.id).then(()=>loadAll());
-    row.appendChild(nm);row.appendChild(cor);row.appendChild(papel);row.appendChild(EL('span'));
-    pan.appendChild(row);
+    r1.appendChild(nm);r1.appendChild(cor);r1.appendChild(papel);pan.appendChild(r1);
+    const r2=EL('div','row spread'); r2.style.marginTop='11px';
+    r2.appendChild(Object.assign(EL('div','muted'),{style:'font-size:13px',textContent:p.user_id?'✓ Tem acesso (login criado)':'Sem login ainda'}));
+    const btns=EL('div','row');
+    if(p.user_id){const rs=EL('button','btn ghost sm','Resetar senha');rs.onclick=()=>loginModal(p,'reset');btns.appendChild(rs);}
+    else{const cl=EL('button','btn sm','Criar login');cl.onclick=()=>loginModal(p,'create');btns.appendChild(cl);}
+    r2.appendChild(btns); pan.appendChild(r2);
+    w.appendChild(pan);
   });
-  const add=EL('button','btn ghost sm','+ Profissional');add.style.marginTop='12px';
+  const add=EL('button','btn ghost sm','+ Profissional');add.style.marginTop='14px';
   add.onclick=async()=>{await sb.from('profissionais').insert({nome:'Nova profissional',ordem:S.pros.length});await loadAll();render()};
-  pan.appendChild(add); w.appendChild(pan);
+  w.appendChild(add);
   return w;
+}
+function loginModal(p,mode){
+  const m=EL('div','modal'); m.appendChild(EL('h3',null,(mode==='create'?'Criar login — ':'Resetar senha — ')+p.nome));
+  const email=inp('email','','e-mail da profissional'); const pw=inp('password','','senha (mín. 6)');
+  if(mode==='create') m.appendChild(field('E-mail dela',email));
+  m.appendChild(field(mode==='create'?'Senha de acesso':'Nova senha',pw));
+  const msg=EL('div','muted');msg.style.fontSize='13px';m.appendChild(msg);
+  const act=EL('div','mactions');
+  const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
+  const save=EL('button','btn','Salvar');
+  save.onclick=async()=>{
+    if(pw.value.length<6){msg.textContent='A senha precisa de 6+ caracteres.';msg.style.color='var(--alert)';return;}
+    if(mode==='create' && !email.value.includes('@')){msg.textContent='E-mail inválido.';msg.style.color='var(--alert)';return;}
+    save.textContent='Salvando…';
+    const body=mode==='create'?{action:'create',email:email.value.trim(),password:pw.value,profissional_id:p.id}:{action:'setpassword',user_id:p.user_id,password:pw.value};
+    const {data,error}=await sb.functions.invoke('admin-users',{body});
+    const err=(data&&data.error)||(error&&error.message);
+    if(err){msg.textContent='Erro: '+err;msg.style.color='var(--alert)';save.textContent='Salvar';return;}
+    msg.textContent=mode==='create'?'Login criado ✓':'Senha trocada ✓';msg.style.color='var(--win)';
+    await loadAll(); setTimeout(()=>{ov.remove();render()},1000);
+  };
+  act.appendChild(cancel);act.appendChild(save);m.appendChild(act);
+  const ov=overlay(m); (mode==='create'?email:pw).focus();
+}
+function minhaConta(){
+  const m=EL('div','modal'); m.appendChild(EL('h3',null,'Minha conta'));
+  m.appendChild(EL('p','muted','Trocar a sua senha de acesso.'));
+  const p1=inp('password','','nova senha (mín. 6)'); const p2=inp('password','','repetir senha');
+  m.appendChild(field('Nova senha',p1)); m.appendChild(field('Repetir',p2));
+  const msg=EL('div','muted');msg.style.fontSize='13px';m.appendChild(msg);
+  const act=EL('div','mactions');
+  const cancel=EL('button','btn ghost','Fechar');cancel.onclick=()=>ov.remove();
+  const save=EL('button','btn','Salvar senha');
+  save.onclick=async()=>{
+    if(p1.value.length<6){msg.textContent='Mínimo 6 caracteres.';msg.style.color='var(--alert)';return;}
+    if(p1.value!==p2.value){msg.textContent='As senhas não batem.';msg.style.color='var(--alert)';return;}
+    save.textContent='Salvando…';
+    const {error}=await sb.auth.updateUser({password:p1.value});
+    if(error){msg.textContent='Erro: '+error.message;msg.style.color='var(--alert)';save.textContent='Salvar senha';return;}
+    msg.textContent='Senha alterada ✓';msg.style.color='var(--win)';setTimeout(()=>ov.remove(),1200);
+  };
+  act.appendChild(cancel);act.appendChild(save);m.appendChild(act);
+  const ov=overlay(m); p1.focus();
 }
 
 // ---------- helpers UI ----------
