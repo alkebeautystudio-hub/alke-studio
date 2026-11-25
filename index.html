@@ -274,7 +274,7 @@ const proById=id=>S.pros.find(p=>p.id===id)||{};
 const servById=id=>S.servicos.find(s=>s.id===id)||{};
 const isAdmin=()=>!!S.me.admin;
 const isSocia=()=>!!S.me.socia;
-const canMoney=proId=>isAdmin()||S.me.id===proId;
+const canMoney=proId=>isAdmin()||isSocia()||S.me.id===proId;
 const canPreco=()=>isAdmin()||isSocia();            // quem vê/edita preço e custo do catálogo
 const pctPro=p=>{const v=Number((p||{}).percentual);return isNaN(v)?30:v};
 const permOf=(p,key)=>{const pm=(p&&p.permissoes)||{}; if(key==='funil')return pm.funil!==false; return !!pm[key];};
@@ -658,7 +658,7 @@ function resumo(proId){
 function viewPainel(){
   const w=EL('div'); w.appendChild(pageHead('Dashboard', S.me.nome));
   w.appendChild(rangeBar());
-  if(isAdmin()){
+  if(isAdmin()||isSocia()){
     S.dashPro = S.dashPro||null;
     // seletor: Geral ou a visão completa de uma profissional
     const chips=EL('div','rangebar'); chips.style.marginTop='6px';
