@@ -957,14 +957,21 @@ function viewMeuDia(){
 // ---------- META ----------
 const nMil=n=>Number(n||0).toLocaleString('pt-BR');
 function viewMeta(){
+  S.metaLevel=S.metaLevel||'campaign';
   const w=EL('div'); w.appendChild(pageHead('Meta Ads','tráfego pago da Alke'));
   w.appendChild(rangeBar());
+  // seletor de nível: campanha > conjunto > anúncio
+  const tog=EL('div','segtog'); tog.style.marginTop='8px';
+  [['campaign','Campanhas'],['adset','Conjuntos'],['ad','Anúncios']].forEach(([k,l])=>{
+    const b=EL('button',S.metaLevel===k?'on':'',l);b.onclick=()=>{S.metaLevel=k;render()};tog.appendChild(b);
+  });
+  w.appendChild(tog);
   const box=EL('div'); box.style.marginTop='12px';
   box.appendChild(Object.assign(EL('div','muted'),{textContent:'Carregando dados do Meta…'}));
   w.appendChild(box);
   (async()=>{
     let res;
-    try{ res=await sb.functions.invoke('meta-insights',{body:{since:S.dashFrom,until:S.dashTo}}); }
+    try{ res=await sb.functions.invoke('meta-insights',{body:{since:S.dashFrom,until:S.dashTo,level:S.metaLevel}}); }
     catch(e){ res={error:e}; }
     box.innerHTML='';
     const data=res&&res.data;
@@ -984,9 +991,10 @@ function viewMeta(){
     const rb=EL('div'); rb.style.cssText='margin:12px 0;padding:13px 15px;border-radius:12px;background:var(--goldsoft);font-size:14px;line-height:1.5';
     rb.innerHTML='No período o studio gastou <b>'+fmt(t.gasto)+'</b> em anúncios e faturou <b>'+fmt(fat)+'</b>.'+(t.gasto>0?(' Pra cada R$1 no tráfego, voltou <b>'+roas.toFixed(1).replace('.',',')+'x</b> em faturamento.'):'');
     box.appendChild(rb);
-    const pan=EL('div','panel'); pan.appendChild(EL('h3',null,'Por campanha'));
+    const titNiv=S.metaLevel==='ad'?'Por anúncio':S.metaLevel==='adset'?'Por conjunto':'Por campanha';
+    const pan=EL('div','panel'); pan.appendChild(EL('h3',null,titNiv));
     const camps=data.campanhas||[];
-    if(!camps.length) pan.appendChild(EL('p','muted','Sem campanhas no período.'));
+    if(!camps.length) pan.appendChild(EL('p','muted','Sem dados no período.'));
     camps.sort((a,b)=>b.gasto-a.gasto).forEach(c=>{
       const row=EL('div','rowline'); const left=EL('div'); left.style.minWidth='0';
       left.appendChild(Object.assign(EL('div'),{textContent:c.nome,style:'font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
