@@ -96,6 +96,14 @@ button{cursor:pointer}
 .card .svline .svdt{flex:0 0 auto;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
 .card .svline .svval{margin-left:auto;color:var(--win);font-weight:600;font-variant-numeric:tabular-nums;flex:0 0 auto}
 .svrow{padding:11px 0;border-bottom:1px solid var(--line)}.svrow:last-child{border-bottom:0}
+.bdaycols{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:8px}
+.bdaycol{background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:11px 12px;min-width:0}
+.bdaycol .eyebrow{display:block;margin-bottom:4px}
+.bdayrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.bdaycol .bdayrow:last-child{border-bottom:0}
+.bdayrow.today{background:var(--goldsoft);border-radius:8px;padding:7px 9px;border-bottom:0;margin:3px 0}
+.bdaybanner{display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:12px;background:var(--goldsoft);margin-bottom:12px}
+@media(max-width:640px){.bdaycols{grid-template-columns:1fr}}
 .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
 .tag{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;letter-spacing:.02em}
 .tag.org{background:var(--goldsoft);color:var(--gold)}
@@ -385,6 +393,9 @@ function cardLead(l){
   if(l.origem) tags.appendChild(EL('span','tag org',l.origem));
   const al=leadAlert(l); if(al) tags.appendChild(EL('span','tag '+al.cls,al.txt));
   if(l.retorno){const dd=Math.ceil((new Date(l.retorno)-new Date())/864e5);if(dd<=7)tags.appendChild(EL('span','tag wn',dd<=0?'retorno hoje':'retorno '+dd+'d'));}
+  const bd=bdayInfo(l.nascimento);
+  if(bd&&bd.today){tags.appendChild(EL('span','tag money','🎂 aniversário hoje'));c.style.background='var(--goldsoft)';}
+  else if(bd&&bd.daysTo<=7)tags.appendChild(EL('span','tag wn','🎂 dia '+String(bd.dia).padStart(2,'0')));
   if(tags.children.length) c.appendChild(tags);
   // atalho só pra quem ainda não agendou; marcar serviço é DENTRO do card
   const e=l.etapa||'lead';
@@ -709,17 +720,48 @@ function openDespesa(){
   act.appendChild(cancel);act.appendChild(save);m.appendChild(act);const ov=overlay(m);desc.focus();
 }
 
+// info de aniversário a partir do nascimento (lê a string Y-M-D direto, sem fuso)
+function bdayInfo(nasc){
+  if(!nasc) return null;
+  const m=String(nasc).slice(0,10).split('-'); if(m.length<3) return null;
+  const by=+m[0], bmo=+m[1]-1, bd=+m[2]; if(isNaN(bmo)||isNaN(bd)) return null;
+  const now=new Date(); now.setHours(0,0,0,0);
+  const monD=new Date(mondayOf(now.toISOString().slice(0,10))+'T00:00:00');
+  const sun=new Date(monD); sun.setDate(sun.getDate()+6);
+  const thisY=new Date(now.getFullYear(),bmo,bd);
+  const today=(bmo===now.getMonth() && bd===now.getDate());
+  const thisWeek=thisY>=monD && thisY<=sun;
+  const thisMonth=(bmo===now.getMonth());
+  let next=new Date(now.getFullYear(),bmo,bd); if(next<now) next=new Date(now.getFullYear()+1,bmo,bd);
+  const daysTo=Math.round((next-now)/864e5);
+  const age=by>1900?(next.getFullYear()-by):null;
+  return {dia:bd,mes:bmo,today,thisWeek,thisMonth,daysTo,age};
+}
+const waLink=tel=>'https://wa.me/55'+String(tel||'').replace(/\D/g,'').replace(/^55/,'');
 function aniversariantesPanel(){
-  const mesesNum=new Set([...mesesNoRange()].map(k=>Number(k.split('-')[1])));
-  const bdays=S.leads.filter(l=>l.nascimento && mesesNum.has(new Date(l.nascimento).getUTCMonth()+1));
-  const p=EL('div','panel'); p.appendChild(EL('h3',null,'🎂 Aniversariantes do período'));
-  if(!bdays.length){p.appendChild(EL('p','muted','Ninguém faz aniversário neste mês (ou faltam datas de nascimento nas fichas).'));return p;}
-  bdays.sort((a,b)=>new Date(a.nascimento).getUTCDate()-new Date(b.nascimento).getUTCDate());
-  bdays.forEach(l=>{const row=EL('div','rowline');
-    const d=new Date(l.nascimento).getUTCDate();
-    row.appendChild(EL('span',null,'dia '+String(d).padStart(2,'0')+' · '+(l.nome||'—')));
-    if(l.telefone){const a=EL('a','lk','Parabenizar');a.href='https://wa.me/55'+l.telefone.replace(/\D/g,'').replace(/^55/,'');a.target='_blank';a.rel='noopener';row.appendChild(a);}
-    p.appendChild(row);});
+  const withB=S.leads.filter(l=>l.nascimento).map(l=>({l,b:bdayInfo(l.nascimento)})).filter(x=>x.b);
+  const mesN=new Date().toLocaleDateString('pt-BR',{month:'long'});
+  const p=EL('div','panel'); p.appendChild(EL('h3',null,'🎂 Aniversariantes'));
+  const mkCol=(titulo,arr,vazio)=>{
+    const col=EL('div','bdaycol'); col.appendChild(EL('div','eyebrow',titulo));
+    if(!arr.length){col.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:4px;font-size:12.5px',textContent:vazio}));return col;}
+    [...arr].sort((a,b)=>a.b.dia-b.b.dia).forEach(({l,b})=>{
+      const row=EL('div','bdayrow'+(b.today?' today':''));
+      const left=EL('div'); left.style.minWidth='0';
+      left.appendChild(Object.assign(EL('div'),{textContent:(b.today?'🎂 hoje · ':'dia '+String(b.dia).padStart(2,'0')+' · ')+(l.nome||'—'),style:'font-weight:'+(b.today?'700':'600')+';font-size:13px'}));
+      if(b.age)left.appendChild(Object.assign(EL('div','muted'),{textContent:'faz '+b.age+' anos',style:'font-size:11.5px'}));
+      row.appendChild(left);
+      if(l.telefone){const a=EL('a','lk','Parabenizar');a.href=waLink(l.telefone);a.target='_blank';a.rel='noopener';row.appendChild(a);}
+      col.appendChild(row);
+    });
+    return col;
+  };
+  const cols=EL('div','bdaycols');
+  cols.appendChild(mkCol('No mês ('+mesN+')', withB.filter(x=>x.b.thisMonth), 'Ninguém no mês.'));
+  cols.appendChild(mkCol('Nesta semana', withB.filter(x=>x.b.thisWeek), 'Ninguém nesta semana.'));
+  cols.appendChild(mkCol('Hoje', withB.filter(x=>x.b.today), 'Ninguém hoje.'));
+  p.appendChild(cols);
+  if(!withB.length) p.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:6px',textContent:'Cadastre a data de nascimento nas fichas pra ver os aniversários aqui.'}));
   return p;
 }
 // ---------- EQUIPE (admin) ----------
@@ -924,9 +966,11 @@ function viewClientes(){
     arr.forEach(c=>{
       const ids=c.leads.map(l=>l.id);
       const realizados=S.agendamentos.filter(a=>ids.includes(a.lead_id)&&a.status==='realizado').length;
+      const bd=bdayInfo(c.nascimento);
       const row=EL('div','rowline'); row.style.cursor='pointer';
+      if(bd&&bd.today){row.style.background='var(--goldsoft)';row.style.borderRadius='9px';row.style.padding='9px 10px';}
       const left=EL('div');
-      left.appendChild(Object.assign(EL('div'),{textContent:c.nome||'—',style:'font-weight:600'}));
+      left.appendChild(Object.assign(EL('div'),{textContent:(bd&&bd.today?'🎂 ':'')+(c.nome||'—'),style:'font-weight:600'}));
       const sub=[c.telefone,c.nascimento?('🎂 '+brDate(c.nascimento,{day:'2-digit',month:'2-digit'})):'',c.email,c.instagram,c.origem].filter(Boolean).join(' · ');
       left.appendChild(Object.assign(EL('div','muted'),{textContent:sub||'—',style:'font-size:12.5px'}));
       row.appendChild(left);
@@ -943,8 +987,20 @@ function viewClientes(){
 function openCliente(c){
   const m=EL('div','modal big'); m.appendChild(EL('h3',null,c.nome||'Cliente'));
   const info=EL('div','muted');info.style.cssText='font-size:13.5px;margin-bottom:12px';
-  info.textContent=[c.telefone,c.nascimento?('🎂 '+brDate(c.nascimento,{day:'2-digit',month:'long'})):'',c.email,c.instagram,c.origem].filter(Boolean).join('  ·  ');
+  info.textContent=[c.telefone,c.email,c.instagram,c.origem].filter(Boolean).join('  ·  ');
   m.appendChild(info);
+  // data de nascimento em EVIDÊNCIA
+  const bd=bdayInfo(c.nascimento);
+  if(bd){
+    const bb=EL('div','bdaybanner');
+    bb.appendChild(Object.assign(EL('div'),{textContent:'🎂',style:'font-size:26px'}));
+    const tx=EL('div'); tx.style.minWidth='0';
+    tx.appendChild(Object.assign(EL('div'),{textContent:'Nascimento: '+String(bd.dia).padStart(2,'0')+' de '+new Date(2000,bd.mes,1).toLocaleDateString('pt-BR',{month:'long'}),style:'font-weight:700'}));
+    tx.appendChild(Object.assign(EL('div','muted'),{textContent:(bd.today?'É hoje! 🎉':(bd.daysTo===1?'amanhã':'em '+bd.daysTo+' dias'))+(bd.age?' · faz '+bd.age+' anos':''),style:'font-size:12.5px'}));
+    bb.appendChild(tx);
+    if(c.telefone){const a=EL('a','lk','Parabenizar');a.href=waLink(c.telefone);a.target='_blank';a.rel='noopener';a.style.marginLeft='auto';bb.appendChild(a);}
+    m.appendChild(bb);
+  }
   const ids=c.leads.map(l=>l.id);
   const servs=S.agendamentos.filter(a=>ids.includes(a.lead_id)&&a.status!=='cancelado');
   const realizados=servs.filter(a=>a.status==='realizado');
