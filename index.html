@@ -288,7 +288,7 @@ function openDrawer(){document.querySelector('.side')?.classList.add('open');doc
 function closeDrawer(){document.querySelector('.side')?.classList.remove('open');document.getElementById('drawov')?.classList.remove('on')}
 function renderShell(){
   const tabs=[['meudia','Meu dia','☀'],['funil','Funil','◇'],['agenda','Agenda','▦'],['clientes','Clientes','♥'],['aniversarios','Aniversários','🎂'],['servicos','Serviços','✦'],['painel','Painel','◉']];
-  if(isAdmin()) tabs.push(['equipe','Equipe','♛']);
+  if(isAdmin()){tabs.push(['meta','Meta','❖']);tabs.push(['equipe','Equipe','♛']);}
   const nav=document.getElementById('nav'); nav.innerHTML='';
   tabs.forEach(([k,l,ic])=>{
     const b=EL('button','nav'+(S.tab===k?' on':''));
@@ -319,6 +319,7 @@ function render(){
   else if(S.tab==='aniversarios') v.appendChild(viewAniversarios());
   else if(S.tab==='servicos') v.appendChild(viewServicos());
   else if(S.tab==='painel') v.appendChild(viewPainel());
+  else if(S.tab==='meta') v.appendChild(viewMeta());
   else if(S.tab==='equipe') v.appendChild(viewEquipe());
 }
 function pageHead(title,sub){
@@ -953,6 +954,52 @@ function viewMeuDia(){
   w.appendChild(Object.assign(EL('p','hint'),{style:'margin-top:8px',textContent:'Resumo do seu dia — atualiza sozinho conforme os agendamentos entram.'}));
   return w;
 }
+// ---------- META ----------
+const nMil=n=>Number(n||0).toLocaleString('pt-BR');
+function viewMeta(){
+  const w=EL('div'); w.appendChild(pageHead('Meta Ads','tráfego pago da Alke'));
+  w.appendChild(rangeBar());
+  const box=EL('div'); box.style.marginTop='12px';
+  box.appendChild(Object.assign(EL('div','muted'),{textContent:'Carregando dados do Meta…'}));
+  w.appendChild(box);
+  (async()=>{
+    let res;
+    try{ res=await sb.functions.invoke('meta-insights',{body:{since:S.dashFrom,until:S.dashTo}}); }
+    catch(e){ res={error:e}; }
+    box.innerHTML='';
+    const data=res&&res.data;
+    if(!data||res.error||data.error){
+      box.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:4px',textContent:'Não consegui puxar o Meta agora'+(data&&data.error?': '+data.error:'. O token pode ter expirado — me avisa que eu renovo.')}));
+      return;
+    }
+    const t=data.total||{gasto:0,alcance:0,conversas:0,leads:0};
+    const fat=vendasMes().reduce((s,a)=>s+(valorAt(a)||0),0);
+    const g=EL('div','grid');
+    g.appendChild(tile('Gasto no tráfego',fmt(t.gasto)));
+    g.appendChild(tile('Alcance',nMil(t.alcance)));
+    g.appendChild(tile('Conversas iniciadas',nMil((t.conversas||0)+(t.leads||0))));
+    g.appendChild(tile('Faturamento do studio',fmt(fat),'pos'));
+    box.appendChild(g);
+    const roas=t.gasto>0?(fat/t.gasto):0;
+    const rb=EL('div'); rb.style.cssText='margin:12px 0;padding:13px 15px;border-radius:12px;background:var(--goldsoft);font-size:14px;line-height:1.5';
+    rb.innerHTML='No período o studio gastou <b>'+fmt(t.gasto)+'</b> em anúncios e faturou <b>'+fmt(fat)+'</b>.'+(t.gasto>0?(' Pra cada R$1 no tráfego, voltou <b>'+roas.toFixed(1).replace('.',',')+'x</b> em faturamento.'):'');
+    box.appendChild(rb);
+    const pan=EL('div','panel'); pan.appendChild(EL('h3',null,'Por campanha'));
+    const camps=data.campanhas||[];
+    if(!camps.length) pan.appendChild(EL('p','muted','Sem campanhas no período.'));
+    camps.sort((a,b)=>b.gasto-a.gasto).forEach(c=>{
+      const row=EL('div','rowline'); const left=EL('div'); left.style.minWidth='0';
+      left.appendChild(Object.assign(EL('div'),{textContent:c.nome,style:'font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
+      left.appendChild(Object.assign(EL('div','muted'),{textContent:'alcance '+nMil(c.alcance)+' · '+nMil((c.conversas||0)+(c.leads||0))+' conversas · '+nMil(c.cliques)+' cliques',style:'font-size:12px'}));
+      row.appendChild(left);
+      row.appendChild(Object.assign(EL('b','serif'),{textContent:fmt(c.gasto),style:'white-space:nowrap;margin-left:10px'}));
+      pan.appendChild(row);
+    });
+    box.appendChild(pan);
+    box.appendChild(Object.assign(EL('p','hint'),{style:'margin-top:8px',textContent:'Dados ao vivo da conta de anúncio da Alke. O faturamento é o total do studio no período — nem toda venda vem do tráfego, então use como termômetro, não atribuição exata.'}));
+  })();
+  return w;
+}
 // ---------- ANIVERSÁRIOS ----------
 function viewAniversarios(){
   const w=EL('div'); w.appendChild(pageHead('Aniversários', new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'})));
@@ -1061,6 +1108,11 @@ function viewEquipe(){
     papel.style.cssText='padding:9px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';
     papel.onchange=()=>sb.from('profissionais').update({admin:papel.value==='admin',socia:papel.value==='socia'}).eq('id',p.id).then(()=>loadAll());
     r1.appendChild(nm);r1.appendChild(cor);r1.appendChild(papel);pan.appendChild(r1);
+    // e-mail (Google) — usado pros convites da agenda e pro login
+    const em=document.createElement('input');em.type='email';em.value=p.email||'';em.placeholder='e-mail Google (convite da agenda + login)';
+    em.style.cssText='width:100%;margin-top:9px;padding:9px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';
+    em.onchange=()=>sb.from('profissionais').update({email:em.value.trim()||null}).eq('id',p.id);
+    pan.appendChild(em);
     const r2=EL('div','row spread'); r2.style.marginTop='11px';
     r2.appendChild(Object.assign(EL('div','muted'),{style:'font-size:13px',textContent:p.user_id?'✓ Tem acesso (login criado)':'Sem login ainda'}));
     const btns=EL('div','row');
