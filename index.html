@@ -92,7 +92,8 @@ button{cursor:pointer}
 .card .mini{font-size:12px;color:var(--muted);margin-top:3px}
 .card .svline{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink);margin-top:4px}
 .card .svline .svic{width:13px;flex:0 0 auto;font-weight:700;text-align:center}
-.card .svline .svtx{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .svline .svtx{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .svline .svdt{flex:0 0 auto;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
 .card .svline .svval{margin-left:auto;color:var(--win);font-weight:600;font-variant-numeric:tabular-nums;flex:0 0 auto}
 .svrow{padding:11px 0;border-bottom:1px solid var(--line)}.svrow:last-child{border-bottom:0}
 .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
@@ -370,6 +371,8 @@ function cardLead(l){
       const t=EL('span','svtx',(sv.nome||'serviço')+' · '+(pro.nome||''));
       if(a.status==='faltou')t.style.textDecoration='line-through';
       line.appendChild(t);
+      const quando=a.status==='realizado'?(a.realizado_em||a.inicio):a.inicio;
+      if(quando)line.appendChild(EL('span','svdt',new Date(quando).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})));
       const vf=valorAt(a);
       if(a.status==='realizado'&&vf!=null&&canMoney(a.profissional_id))line.appendChild(EL('span','svval',fmt(vf)));
       c.appendChild(line);
@@ -399,11 +402,25 @@ async function move(l,etapa){
   await sb.from('leads').update(upd).eq('id',l.id);
   await loadAll(); render();
 }
+// recalcula a etapa do card a partir dos serviços:
+// tem serviço pendente -> Agendada; todos realizados -> Realizou; sobrou falta -> Não veio
+async function recomputeEtapa(leadId){
+  const l=S.leads.find(x=>x.id===leadId); if(!l) return;
+  const servs=servicosDoLead(leadId);
+  if(!servs.length) return; // sem serviço: mantém etapa manual (lead/conversa/followup)
+  const pend=servs.filter(a=>a.status==='marcado').length;
+  const real=servs.filter(a=>a.status==='realizado').length;
+  let etapa = pend>0 ? 'agendada' : (real===servs.length ? 'realizou' : 'naoveio');
+  if(l.etapa===etapa) return;
+  const upd={etapa,atualizado_em:new Date().toISOString()};
+  if(etapa==='realizou'&&!l.realizado_em) upd.realizado_em=new Date().toISOString();
+  await sb.from('leads').update(upd).eq('id',leadId);
+}
 // marca UM serviço (agendamento) como realizado/faltou, de dentro do card
 async function marcarServico(agId,status,leadId){
   await sb.from('agendamentos').update({status,realizado_em:status==='realizado'?new Date().toISOString():null}).eq('id',agId);
-  if(status==='realizado'&&leadId){const l=S.leads.find(x=>x.id===leadId);if(l&&!['realizou','naoveio'].includes(l.etapa))await sb.from('leads').update({etapa:'realizou',atualizado_em:new Date().toISOString()}).eq('id',leadId);}
   await loadAll();
+  if(leadId){ await recomputeEtapa(leadId); await loadAll(); }
   document.querySelectorAll('.ov').forEach(o=>o.remove());
   render();
   if(leadId) openLead(leadId);
@@ -815,7 +832,7 @@ function openAgendamento(ag,prefill){
   m.appendChild(field('Desconto (R$), se teve',desc));
   m.appendChild(field('Observações',obs)); m.appendChild(warn);
   const act=EL('div','mactions');
-  if(isEdit){const del=EL('button','btn ghost sm','Excluir');del.style.marginRight='auto';del.onclick=async()=>{await sb.from('agendamentos').delete().eq('id',ag.id);ov.remove();await loadAll();render()};act.appendChild(del);}
+  if(isEdit){const del=EL('button','btn ghost sm','Excluir');del.style.marginRight='auto';del.onclick=async()=>{const lid=ag.lead_id;await sb.from('agendamentos').delete().eq('id',ag.id);ov.remove();await loadAll();if(lid){await recomputeEtapa(lid);await loadAll();}render()};act.appendChild(del);}
   const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
   const save=EL('button','btn','Salvar');
   save.onclick=async()=>{
@@ -844,8 +861,9 @@ function openAgendamento(ag,prefill){
     if(leadId) row.lead_id=leadId;
     if(isEdit) await sb.from('agendamentos').update(row).eq('id',ag.id);
     else await sb.from('agendamentos').insert(row);
-    if(leadId){const ld=S.leads.find(x=>x.id===leadId);if(!ld||!['realizou','naoveio'].includes(ld.etapa))await sb.from('leads').update({etapa:'agendada',atualizado_em:new Date().toISOString()}).eq('id',leadId);}
-    ov.remove(); await loadAll(); render();
+    ov.remove(); await loadAll();
+    if(leadId){ await recomputeEtapa(leadId); await loadAll(); }
+    render();
   };
   act.appendChild(cancel);act.appendChild(save);m.appendChild(act);
   const ov=overlay(m); nome.focus();
