@@ -287,7 +287,7 @@ const statusLabel=s=>s==='realizado'?'realizado':s==='faltou'?'faltou':s==='canc
 function openDrawer(){document.querySelector('.side')?.classList.add('open');document.getElementById('drawov')?.classList.add('on')}
 function closeDrawer(){document.querySelector('.side')?.classList.remove('open');document.getElementById('drawov')?.classList.remove('on')}
 function renderShell(){
-  const tabs=[['meudia','Meu dia','☀'],['funil','Funil','◇'],['agenda','Agenda','▦'],['clientes','Clientes','♥'],['servicos','Serviços','✦'],['painel','Painel','◉']];
+  const tabs=[['meudia','Meu dia','☀'],['funil','Funil','◇'],['agenda','Agenda','▦'],['clientes','Clientes','♥'],['aniversarios','Aniversários','🎂'],['servicos','Serviços','✦'],['painel','Painel','◉']];
   if(isAdmin()) tabs.push(['equipe','Equipe','♛']);
   const nav=document.getElementById('nav'); nav.innerHTML='';
   tabs.forEach(([k,l,ic])=>{
@@ -316,6 +316,7 @@ function render(){
   else if(S.tab==='funil') v.appendChild(viewFunil());
   else if(S.tab==='agenda') v.appendChild(viewAgenda());
   else if(S.tab==='clientes') v.appendChild(viewClientes());
+  else if(S.tab==='aniversarios') v.appendChild(viewAniversarios());
   else if(S.tab==='servicos') v.appendChild(viewServicos());
   else if(S.tab==='painel') v.appendChild(viewPainel());
   else if(S.tab==='equipe') v.appendChild(viewEquipe());
@@ -747,7 +748,8 @@ function aniversariantesPanel(){
     if(!arr.length){col.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:4px;font-size:12.5px',textContent:vazio}));return col;}
     [...arr].sort((a,b)=>a.b.dia-b.b.dia).forEach(({l,b})=>{
       const row=EL('div','bdayrow'+(b.today?' today':''));
-      const left=EL('div'); left.style.minWidth='0';
+      const left=EL('div'); left.style.minWidth='0'; left.style.cursor='pointer';
+      left.onclick=()=>openLead(l.id);
       left.appendChild(Object.assign(EL('div'),{textContent:(b.today?'🎂 hoje · ':'dia '+String(b.dia).padStart(2,'0')+' · ')+(l.nome||'—'),style:'font-weight:'+(b.today?'700':'600')+';font-size:13px'}));
       if(b.age)left.appendChild(Object.assign(EL('div','muted'),{textContent:'faz '+b.age+' anos',style:'font-size:11.5px'}));
       row.appendChild(left);
@@ -949,6 +951,13 @@ function viewMeuDia(){
   w.appendChild(Object.assign(EL('p','hint'),{style:'margin-top:8px',textContent:'Resumo do seu dia — atualiza sozinho conforme os agendamentos entram.'}));
   return w;
 }
+// ---------- ANIVERSÁRIOS ----------
+function viewAniversarios(){
+  const w=EL('div'); w.appendChild(pageHead('Aniversários', new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'})));
+  w.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:4px',textContent:'Mês, semana e dia. Toque num nome pra abrir a cliente, ou em Parabenizar pra chamar no WhatsApp.'}));
+  w.appendChild(aniversariantesPanel());
+  return w;
+}
 // ---------- CLIENTES ----------
 function viewClientes(){
   const w=EL('div'); w.appendChild(pageHead('Clientes'));
@@ -986,9 +995,6 @@ function viewClientes(){
 }
 function openCliente(c){
   const m=EL('div','modal big'); m.appendChild(EL('h3',null,c.nome||'Cliente'));
-  const info=EL('div','muted');info.style.cssText='font-size:13.5px;margin-bottom:12px';
-  info.textContent=[c.telefone,c.email,c.instagram,c.origem].filter(Boolean).join('  ·  ');
-  m.appendChild(info);
   // data de nascimento em EVIDÊNCIA
   const bd=bdayInfo(c.nascimento);
   if(bd){
@@ -1001,6 +1007,14 @@ function openCliente(c){
     if(c.telefone){const a=EL('a','lk','Parabenizar');a.href=waLink(c.telefone);a.target='_blank';a.rel='noopener';a.style.marginLeft='auto';bb.appendChild(a);}
     m.appendChild(bb);
   }
+  // dados de contato (WhatsApp, Instagram, e-mail, origem)
+  const dados=EL('div','panel'); dados.style.marginBottom='12px';
+  const mkd=(label,node)=>{const r=EL('div','rowline');r.appendChild(EL('span','muted',label));r.appendChild(node);return r};
+  if(c.telefone){const a=EL('a','lk',c.telefone);a.href=waLink(c.telefone);a.target='_blank';a.rel='noopener';dados.appendChild(mkd('WhatsApp',a));}
+  if(c.instagram){const ig=String(c.instagram).replace(/^@/,'');const a=EL('a','lk',c.instagram.startsWith('@')?c.instagram:'@'+ig);a.href='https://instagram.com/'+ig;a.target='_blank';a.rel='noopener';dados.appendChild(mkd('Instagram',a));}
+  if(c.email)dados.appendChild(mkd('E-mail',EL('span',null,c.email)));
+  if(c.origem)dados.appendChild(mkd('Origem',EL('span',null,c.origem)));
+  if(dados.children.length) m.appendChild(dados);
   const ids=c.leads.map(l=>l.id);
   const servs=S.agendamentos.filter(a=>ids.includes(a.lead_id)&&a.status!=='cancelado');
   const realizados=servs.filter(a=>a.status==='realizado');
