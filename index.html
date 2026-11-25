@@ -535,7 +535,14 @@ function openLead(id,prefill){
     m.appendChild(sp);
   }
   const act=EL('div','mactions');
-  if(id&&isAdmin()){const del=EL('button','btn ghost sm','Excluir cliente');del.onclick=async()=>{await sb.from('leads').delete().eq('id',id);ov.remove();await loadAll();render()};del.style.marginRight='auto';act.appendChild(del);}
+  if(id&&isAdmin()){const del=EL('button','btn ghost sm','Excluir cliente');del.style.color='var(--alert)';del.onclick=async()=>{
+    if(!confirm('Excluir a cliente '+(nome.value||'')+' e todos os agendamentos dela? Não dá pra desfazer.'))return;
+    const servs=servicosDoLead(id);
+    for(const a of servs){try{if(a.google_event_id)await sb.functions.invoke('agenda-sync',{body:{action:'delete',event_id:a.google_event_id}});}catch(_){}}
+    await sb.from('agendamentos').delete().eq('lead_id',id);
+    await sb.from('leads').delete().eq('id',id);
+    ov.remove();await loadAll();render();
+  };del.style.marginRight='auto';act.appendChild(del);}
   const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
   const save=EL('button','btn','Salvar');
   save.onclick=async()=>{
@@ -1287,6 +1294,11 @@ function openCliente(c){
   const futuros=servs.filter(a=>a.status==='marcado'&&new Date(a.inicio)>=new Date()).sort((a,b)=>new Date(a.inicio)-new Date(b.inicio));
   if(futuros.length){const fp=EL('div','panel');fp.appendChild(EL('div','eyebrow','Próximos agendamentos'));futuros.forEach(a=>{const sv=servById(a.servico_id),pro=proById(a.profissional_id);fp.appendChild(Object.assign(EL('div','rowline'),{textContent:new Date(a.inicio).toLocaleDateString('pt-BR')+' '+hhmm(new Date(a.inicio))+' · '+(sv.nome||'')+(pro.nome?' · '+pro.nome:'')}))});m.appendChild(fp);}
   const act=EL('div','mactions');
+  if(isAdmin()){const del=EL('button','btn ghost sm','Excluir');del.style.color='var(--alert)';del.style.marginRight='auto';del.onclick=async()=>{
+    if(!confirm('Excluir '+(c.nome||'cliente')+' e os agendamentos dela? Não dá pra desfazer.'))return;
+    for(const l of c.leads){const servs=servicosDoLead(l.id);for(const a of servs){try{if(a.google_event_id)await sb.functions.invoke('agenda-sync',{body:{action:'delete',event_id:a.google_event_id}});}catch(_){}}await sb.from('agendamentos').delete().eq('lead_id',l.id);await sb.from('leads').delete().eq('id',l.id);}
+    ov.remove();await loadAll();render();
+  };act.appendChild(del);}
   const close=EL('button','btn ghost','Fechar');close.onclick=()=>ov.remove();
   const abrir=EL('button','btn','Abrir ficha / editar');abrir.onclick=()=>{ov.remove();const last=[...c.leads].sort((a,b)=>(b.criado_em||'').localeCompare(a.criado_em||''))[0];openLead(last.id)};
   act.appendChild(close);act.appendChild(abrir);m.appendChild(act);
