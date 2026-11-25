@@ -1278,6 +1278,7 @@ function viewEquipe(){
     const btns=EL('div','row');
     if(p.user_id){const rs=EL('button','btn ghost sm','Resetar senha');rs.onclick=()=>loginModal(p,'reset');btns.appendChild(rs);}
     else{const cl=EL('button','btn sm','Criar login');cl.onclick=()=>loginModal(p,'create');btns.appendChild(cl);}
+    if(!p.admin){const del=EL('button','btn ghost sm','Excluir');del.style.color='var(--alert)';del.onclick=async()=>{if(!confirm('Excluir '+(p.nome||'profissional')+'? Os atendimentos já feitos continuam no histórico.'))return;const {error}=await sb.from('profissionais').delete().eq('id',p.id);if(error){alert('Não consegui excluir agora — ela deve ter serviços ou agendamentos ligados. Apague-os antes, ou me chame.');return;}await loadAll();render()};btns.appendChild(del);}
     r2.appendChild(btns); pan.appendChild(r2);
     w.appendChild(pan);
   });
