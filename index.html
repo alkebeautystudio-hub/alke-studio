@@ -278,7 +278,7 @@ const canMoney=proId=>isAdmin()||S.me.id===proId;
 const canPreco=()=>isAdmin()||isSocia();            // quem vê/edita preço e custo do catálogo
 const pctPro=p=>{const v=Number((p||{}).percentual);return isNaN(v)?30:v};
 const permOf=(p,key)=>{const pm=(p&&p.permissoes)||{}; if(key==='funil')return pm.funil!==false; return !!pm[key];};
-const canTab=key=>{ if(isAdmin()||isSocia())return true; if(key==='funil')return permOf(S.me,'funil'); if(key==='conversas')return permOf(S.me,'conversas'); return true; };
+const canTab=key=>{ if(isAdmin()||isSocia())return true; if(key==='funil')return permOf(S.me,'funil'); if(key==='conversas')return permOf(S.me,'conversas'); if(key==='servicos')return permOf(S.me,'servicos'); return true; };
 // valor que o usuário atual PODE ver: sócia/admin veem bruto; profissional vê o líquido dela (já com a % descontada)
 const valorMostra=a=>{const v=valorAt(a); if(v==null)return null; if(isAdmin()||isSocia())return v; return v*(1-pctPro(S.me)/100);};
 const precoDe=l=>{const p=S.precos[l.servico_id];return p?Number(p.preco):null};
@@ -295,7 +295,7 @@ function openDrawer(){document.querySelector('.side')?.classList.add('open');doc
 function closeDrawer(){document.querySelector('.side')?.classList.remove('open');document.getElementById('drawov')?.classList.remove('on')}
 function renderShell(){
   let tabs=[['meudia','Meu dia','☀'],['funil','Funil','◇'],['agenda','Agenda','▦'],['clientes','Clientes','♥'],['aniversarios','Aniversários','🎂'],['servicos','Serviços','✦'],['painel','Painel','◉']];
-  tabs=tabs.filter(t=>{ if(t[0]==='funil')return canTab('funil'); if(t[0]==='servicos')return canPreco(); return true; });
+  tabs=tabs.filter(t=>{ if(t[0]==='funil')return canTab('funil'); if(t[0]==='servicos')return canTab('servicos'); return true; });
   if(isAdmin()){tabs.push(['meta','Meta','❖']);tabs.push(['equipe','Equipe','♛']);}
   const nav=document.getElementById('nav'); nav.innerHTML='';
   tabs.forEach(([k,l,ic])=>{
@@ -321,7 +321,7 @@ function renderShell(){
 function render(){
   const v=document.getElementById('view'); v.innerHTML='';
   // se o usuário não pode ver a aba atual, cai no Meu dia
-  if((S.tab==='funil'&&!canTab('funil'))||(S.tab==='servicos'&&!canPreco())||((S.tab==='meta'||S.tab==='equipe')&&!isAdmin())) S.tab='meudia';
+  if((S.tab==='funil'&&!canTab('funil'))||(S.tab==='servicos'&&!canTab('servicos'))||((S.tab==='meta'||S.tab==='equipe')&&!isAdmin())) S.tab='meudia';
   if(S.tab==='meudia') v.appendChild(viewMeuDia());
   else if(S.tab==='funil') v.appendChild(viewFunil());
   else if(S.tab==='agenda') v.appendChild(viewAgenda());
@@ -559,7 +559,7 @@ function openLead(id,prefill){
 // ---------- SERVIÇOS ----------
 function viewServicos(){
   const w=EL('div'); const t=pageHead('Serviços');
-  const add=EL('button','btn','+ Serviço');add.style.marginLeft='auto';add.onclick=()=>openServ(null);t.appendChild(add);
+  if(canPreco()){const add=EL('button','btn','+ Serviço');add.style.marginLeft='auto';add.onclick=()=>openServ(null);t.appendChild(add);}
   w.appendChild(t);
   w.appendChild(EL('p','muted','Admin e sócias cadastram os serviços e definem custo e preço de todas as profissionais.'));
   // agrupa por profissional
@@ -1270,6 +1270,7 @@ function viewEquipe(){
         lab.appendChild(cb); lab.appendChild(document.createTextNode(label)); return lab;
       };
       permWrap.appendChild(mkPerm('funil','Funil de vendas',true));
+      permWrap.appendChild(mkPerm('servicos','Serviços (ver catálogo, sem preço)',false));
       permWrap.appendChild(mkPerm('conversas','Conversas (WhatsApp)',false));
       pan.appendChild(permWrap);
     }
