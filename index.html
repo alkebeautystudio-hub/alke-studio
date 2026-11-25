@@ -1012,6 +1012,8 @@ function openCliente(c){
   // dados de contato (WhatsApp, Instagram, e-mail, origem)
   const dados=EL('div','panel'); dados.style.marginBottom='12px';
   const mkd=(label,node)=>{const r=EL('div','rowline');r.appendChild(EL('span','muted',label));r.appendChild(node);return r};
+  // nascimento SEMPRE visível (mesmo fora de aniversário)
+  dados.appendChild(mkd('Nascimento', EL('b', null, c.nascimento?brDate(c.nascimento,{day:'2-digit',month:'2-digit',year:'numeric'})+(bd&&bd.age?' · '+bd.age+' anos':''):'não cadastrada')));
   if(c.telefone){const a=EL('a','lk',c.telefone);a.href=waLink(c.telefone);a.target='_blank';a.rel='noopener';dados.appendChild(mkd('WhatsApp',a));}
   if(c.instagram){const ig=String(c.instagram).replace(/^@/,'');const a=EL('a','lk',c.instagram.startsWith('@')?c.instagram:'@'+ig);a.href='https://instagram.com/'+ig;a.target='_blank';a.rel='noopener';dados.appendChild(mkd('Instagram',a));}
   if(c.email)dados.appendChild(mkd('E-mail',EL('span',null,c.email)));
