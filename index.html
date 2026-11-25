@@ -273,7 +273,14 @@ async function loadAll(){
 const proById=id=>S.pros.find(p=>p.id===id)||{};
 const servById=id=>S.servicos.find(s=>s.id===id)||{};
 const isAdmin=()=>!!S.me.admin;
+const isSocia=()=>!!S.me.socia;
 const canMoney=proId=>isAdmin()||S.me.id===proId;
+const canPreco=()=>isAdmin()||isSocia();            // quem vê/edita preço e custo do catálogo
+const pctPro=p=>{const v=Number((p||{}).percentual);return isNaN(v)?30:v};
+const permOf=(p,key)=>{const pm=(p&&p.permissoes)||{}; if(key==='funil')return pm.funil!==false; return !!pm[key];};
+const canTab=key=>{ if(isAdmin()||isSocia())return true; if(key==='funil')return permOf(S.me,'funil'); if(key==='conversas')return permOf(S.me,'conversas'); return true; };
+// valor que o usuário atual PODE ver: sócia/admin veem bruto; profissional vê o líquido dela (já com a % descontada)
+const valorMostra=a=>{const v=valorAt(a); if(v==null)return null; if(isAdmin()||isSocia())return v; return v*(1-pctPro(S.me)/100);};
 const precoDe=l=>{const p=S.precos[l.servico_id];return p?Number(p.preco):null};
 const custoDe=l=>{const p=S.precos[l.servico_id];return p?Number(p.custo):0};
 const valorFinal=l=>{const pr=precoDe(l);return pr==null?null:pr-(Number(l.desconto)||0)};
@@ -287,7 +294,8 @@ const statusLabel=s=>s==='realizado'?'realizado':s==='faltou'?'faltou':s==='canc
 function openDrawer(){document.querySelector('.side')?.classList.add('open');document.getElementById('drawov')?.classList.add('on')}
 function closeDrawer(){document.querySelector('.side')?.classList.remove('open');document.getElementById('drawov')?.classList.remove('on')}
 function renderShell(){
-  const tabs=[['meudia','Meu dia','☀'],['funil','Funil','◇'],['agenda','Agenda','▦'],['clientes','Clientes','♥'],['aniversarios','Aniversários','🎂'],['servicos','Serviços','✦'],['painel','Painel','◉']];
+  let tabs=[['meudia','Meu dia','☀'],['funil','Funil','◇'],['agenda','Agenda','▦'],['clientes','Clientes','♥'],['aniversarios','Aniversários','🎂'],['servicos','Serviços','✦'],['painel','Painel','◉']];
+  tabs=tabs.filter(t=>{ if(t[0]==='funil')return canTab('funil'); if(t[0]==='servicos')return canPreco(); return true; });
   if(isAdmin()){tabs.push(['meta','Meta','❖']);tabs.push(['equipe','Equipe','♛']);}
   const nav=document.getElementById('nav'); nav.innerHTML='';
   tabs.forEach(([k,l,ic])=>{
@@ -312,6 +320,8 @@ function renderShell(){
 }
 function render(){
   const v=document.getElementById('view'); v.innerHTML='';
+  // se o usuário não pode ver a aba atual, cai no Meu dia
+  if((S.tab==='funil'&&!canTab('funil'))||(S.tab==='servicos'&&!canPreco())||((S.tab==='meta'||S.tab==='equipe')&&!isAdmin())) S.tab='meudia';
   if(S.tab==='meudia') v.appendChild(viewMeuDia());
   else if(S.tab==='funil') v.appendChild(viewFunil());
   else if(S.tab==='agenda') v.appendChild(viewAgenda());
@@ -406,7 +416,7 @@ function cardLead(l){
       line.appendChild(t);
       const quando=a.status==='realizado'?(a.realizado_em||a.inicio):a.inicio;
       if(quando)line.appendChild(EL('span','svdt',new Date(quando).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})));
-      const vf=valorAt(a);
+      const vf=valorMostra(a);
       if(a.status==='realizado'&&vf!=null&&canMoney(a.profissional_id))line.appendChild(EL('span','svval',fmt(vf)));
       c.appendChild(line);
     });
@@ -503,7 +513,7 @@ function openLead(id,prefill){
       const topr=EL('div','row spread');
       const infoc=EL('div');
       infoc.appendChild(Object.assign(EL('div'),{textContent:sv.nome||'serviço',style:'font-weight:600'}));
-      const metaTxt=[pro.nome, a.inicio?(new Date(a.inicio).toLocaleDateString('pt-BR')+' '+hhmm(new Date(a.inicio))):'', (canMoney(a.profissional_id)&&valorAt(a)!=null)?fmt(valorAt(a)):''].filter(Boolean).join(' · ');
+      const metaTxt=[pro.nome, a.inicio?(new Date(a.inicio).toLocaleDateString('pt-BR')+' '+hhmm(new Date(a.inicio))):'', (canMoney(a.profissional_id)&&valorMostra(a)!=null)?fmt(valorMostra(a)):''].filter(Boolean).join(' · ');
       infoc.appendChild(Object.assign(EL('div','muted'),{textContent:metaTxt,style:'font-size:12.5px'}));
       topr.appendChild(infoc);
       const stt=EL('span','tag '+(a.status==='realizado'?'money':a.status==='faltou'?'al':'org'),statusLabel(a.status));
@@ -551,11 +561,11 @@ function viewServicos(){
   const w=EL('div'); const t=pageHead('Serviços');
   const add=EL('button','btn','+ Serviço');add.style.marginLeft='auto';add.onclick=()=>openServ(null);t.appendChild(add);
   w.appendChild(t);
-  w.appendChild(EL('p','muted','Cada profissional cadastra os seus. Nome e tempo todas veem; custo e preço só você e a dona.'));
+  w.appendChild(EL('p','muted','Admin e sócias cadastram os serviços e definem custo e preço de todas as profissionais.'));
   // agrupa por profissional
   S.pros.filter(p=>p.presta_servico!==false).forEach(pro=>{
     const list=S.servicos.filter(s=>s.profissional_id===pro.id);
-    if(!list.length && !(isAdmin()||S.me.id===pro.id)) return;
+    if(!list.length && !canPreco()) return;
     const pan=EL('div','panel');
     const head=EL('div','listhead'); const hn=EL('div');
     const dot=EL('span','dot');dot.style.background=pro.cor;dot.style.marginRight='8px';
@@ -564,7 +574,7 @@ function viewServicos(){
     if(!list.length) pan.appendChild(EL('div','muted','Nenhum serviço ainda.'));
     list.forEach(s=>{
       const price=S.precos[s.id]||{};
-      const canSee=isAdmin()||S.me.id===pro.id;
+      const canSee=canPreco();
       const row=EL('div','srow');
       row.appendChild(EL('span','nm',s.nome));
       row.appendChild(EL('span','muted',(s.tempo_min||0)+' min'));
@@ -580,12 +590,13 @@ function viewServicos(){
   return w;
 }
 function openServ(id){
+  if(!canPreco()) return; // só admin + sócias definem serviços/preços
   const s = id ? {...S.servicos.find(x=>x.id===id)} : {nome:'',profissional_id:S.me.id,tempo_min:30};
   const price = id ? (S.precos[id]||{custo:0,preco:0}) : {custo:0,preco:0};
   const m=EL('div','modal'); m.appendChild(EL('h3',null,id?'Serviço':'Novo serviço'));
   const nome=inp('text',s.nome);
   const proOpts=S.pros.filter(p=>p.presta_servico!==false).map(p=>[p.id,p.nome]);
-  const pro=sel(proOpts, s.profissional_id); if(!isAdmin())pro.disabled=true;
+  const pro=sel(proOpts, s.profissional_id); // admin e sócias escolhem a profissional
   const tempo=inp('number',s.tempo_min); const custo=inp('number',price.custo); const preco=inp('number',price.preco);
   m.appendChild(field('Nome do serviço',nome)); m.appendChild(field('Profissional',pro));
   const two=EL('div','two'); two.appendChild(field('Tempo (min)',tempo)); two.appendChild(field('Custo',custo)); m.appendChild(two);
@@ -646,18 +657,20 @@ function viewPainel(){
   // profissional: só o dela
   const r=resumo(S.me.id);
   const g=EL('div','grid');
-  g.appendChild(tile('Faturamento',fmt(r.fat)));
-  g.appendChild(tile('Atendimentos',String(r.n)));
-  g.appendChild(tile('Ticket médio',fmt(r.ticket)));
-  if(S.me.socia){ g.appendChild(tile('Lucro',fmt(r.fat-r.custo+caixa().saldo/2),'pos')); }
-  else { g.appendChild(tile('A repassar (30%)',fmt(r.fat*0.30),'neg')); }
-  w.appendChild(g);
-  if(S.me.socia){ w.appendChild(caixaPanel()); w.appendChild(despesasPanel()); }
-  else {
-    const p=EL('div','panel');p.appendChild(EL('h3',null,'Repasse ao studio'));
-    p.appendChild(EL('p','muted','Você fica com 70% (menos custo) e repassa 30% ao studio.'));
-    p.appendChild(Object.assign(EL('div'),{innerHTML:'<span class="muted">seu líquido estimado:</span> <b class="serif" style="font-size:22px">'+fmt(r.fat*0.70-r.custo)+'</b>'}));
-    w.appendChild(p);
+  if(S.me.socia){
+    g.appendChild(tile('Faturamento',fmt(r.fat)));
+    g.appendChild(tile('Atendimentos',String(r.n)));
+    g.appendChild(tile('Ticket médio',fmt(r.ticket)));
+    g.appendChild(tile('Lucro',fmt(r.fat-r.custo+caixa().saldo/2),'pos'));
+    w.appendChild(g);
+    w.appendChild(caixaPanel()); w.appendChild(despesasPanel());
+  } else {
+    // profissional vê só o valor dela, já limpo (a % já sai descontada, sem mencionar)
+    const net=r.fat*(1-pctPro(S.me)/100);
+    g.appendChild(tile('Seu faturamento',fmt(net)));
+    g.appendChild(tile('Atendimentos',String(r.n)));
+    g.appendChild(tile('Ticket médio',fmt(r.n?net/r.n:0)));
+    w.appendChild(g);
   }
   w.appendChild(aniversariantesPanel());
   return w;
@@ -682,7 +695,7 @@ function rangeBar(){
 }
 function tile(k,v,cls){const t=EL('div','tile');t.appendChild(EL('div','k',k));t.appendChild(Object.assign(EL('div','v'+(cls?' '+cls:'')),{textContent:v}));return t}
 function caixa(){
-  let entradas=0; vendasMes().forEach(a=>{const p=proById(a.profissional_id);if(!p.socia)entradas+=(valorAt(a)||0)*0.30});
+  let entradas=0; vendasMes().forEach(a=>{const p=proById(a.profissional_id);if(!p.socia)entradas+=(valorAt(a)||0)*(pctPro(p)/100)});
   const meses=mesesNoRange();
   const gastos=S.despesas.filter(d=>meses.has(monthKey(d.mes))).reduce((s,d)=>s+(Number(d.valor)||0),0);
   const fixo=(Number(S.config.custo_total_mes)||0)*meses.size;
@@ -1194,7 +1207,7 @@ function openCliente(c){
   const ids=c.leads.map(l=>l.id);
   const servs=S.agendamentos.filter(a=>ids.includes(a.lead_id)&&a.status!=='cancelado');
   const realizados=servs.filter(a=>a.status==='realizado');
-  const fat=realizados.reduce((s,a)=>s+(valorAt(a)||0),0);
+  const fat=realizados.filter(a=>canMoney(a.profissional_id)).reduce((s,a)=>s+(valorMostra(a)||0),0);
   const g=EL('div','grid');
   g.appendChild(tile('Atendimentos',String(realizados.length)));
   g.appendChild(tile('Total já gasto',fmt(fat)));
@@ -1207,7 +1220,7 @@ function openCliente(c){
     const sv=servById(a.servico_id),pro=proById(a.profissional_id);const row=EL('div','rowline');
     const quando=a.realizado_em||a.inicio;
     row.appendChild(EL('span',null,(quando?new Date(quando).toLocaleDateString('pt-BR'):'—')+' · '+(sv.nome||'serviço')+(pro.nome?' · '+pro.nome:'')));
-    const vf=valorAt(a);if(vf!=null&&canMoney(a.profissional_id))row.appendChild(Object.assign(EL('span','muted'),{textContent:fmt(vf)}));hp.appendChild(row);
+    const vf=valorMostra(a);if(vf!=null&&canMoney(a.profissional_id))row.appendChild(Object.assign(EL('span','muted'),{textContent:fmt(vf)}));hp.appendChild(row);
   });
   m.appendChild(hp);
   const futuros=servs.filter(a=>a.status==='marcado'&&new Date(a.inicio)>=new Date()).sort((a,b)=>new Date(a.inicio)-new Date(b.inicio));
@@ -1238,6 +1251,28 @@ function viewEquipe(){
     em.style.cssText='width:100%;margin-top:9px;padding:9px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';
     em.onchange=()=>sb.from('profissionais').update({email:em.value.trim()||null}).eq('id',p.id);
     pan.appendChild(em);
+    // só pra PROFISSIONAL (não-sócia, não-admin): % do studio + permissões
+    if(!p.admin && !p.socia){
+      const pctWrap=EL('div'); pctWrap.style.cssText='margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+      pctWrap.appendChild(Object.assign(EL('span','muted'),{style:'font-size:13px',textContent:'% que fica pro studio:'}));
+      const pct=inp('number', p.percentual!=null?p.percentual:30); pct.style.cssText='max-width:80px;padding:9px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';
+      pct.onchange=()=>{p.percentual=Number(pct.value)||0;sb.from('profissionais').update({percentual:p.percentual}).eq('id',p.id)};
+      pctWrap.appendChild(pct);
+      pctWrap.appendChild(Object.assign(EL('span','muted'),{style:'font-size:11.5px',textContent:'ela vê o valor já limpo, sem a %'}));
+      pan.appendChild(pctWrap);
+      const permWrap=EL('div'); permWrap.style.cssText='margin-top:11px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center';
+      permWrap.appendChild(Object.assign(EL('div','muted'),{style:'font-size:12px;width:100%;margin-bottom:-2px',textContent:'Pode acessar:'}));
+      const mkPerm=(key,label,def)=>{
+        const lab=EL('label'); lab.style.cssText='display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer';
+        const cb=document.createElement('input');cb.type='checkbox';cb.style.cssText='width:16px;height:16px;accent-color:var(--gold)';
+        const cur=(p.permissoes&&p.permissoes[key]); cb.checked = (cur==null)?def:!!cur;
+        cb.onchange=()=>{const pm=Object.assign({},p.permissoes||{});pm[key]=cb.checked;p.permissoes=pm;sb.from('profissionais').update({permissoes:pm}).eq('id',p.id)};
+        lab.appendChild(cb); lab.appendChild(document.createTextNode(label)); return lab;
+      };
+      permWrap.appendChild(mkPerm('funil','Funil de vendas',true));
+      permWrap.appendChild(mkPerm('conversas','Conversas (WhatsApp)',false));
+      pan.appendChild(permWrap);
+    }
     const r2=EL('div','row spread'); r2.style.marginTop='11px';
     r2.appendChild(Object.assign(EL('div','muted'),{style:'font-size:13px',textContent:p.user_id?'✓ Tem acesso (login criado)':'Sem login ainda'}));
     const btns=EL('div','row');
