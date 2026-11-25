@@ -274,7 +274,8 @@ const proById=id=>S.pros.find(p=>p.id===id)||{};
 const servById=id=>S.servicos.find(s=>s.id===id)||{};
 const isAdmin=()=>!!S.me.admin;
 const isSocia=()=>!!S.me.socia;
-const canMoney=proId=>isAdmin()||isSocia()||S.me.id===proId;
+// admin vê tudo; cada um vê o seu; sócia vê também as NÃO-sócias, mas NÃO a outra sócia
+const canMoney=proId=>{ if(isAdmin())return true; if(S.me.id===proId)return true; if(S.me.socia){const p=proById(proId);return !p.socia;} return false; };
 const canPreco=()=>isAdmin()||isSocia();            // quem vê/edita preço e custo do catálogo
 const pctPro=p=>{const v=Number((p||{}).percentual);return isNaN(v)?30:v};
 const permOf=(p,key)=>{const pm=(p&&p.permissoes)||{}; if(key==='funil')return pm.funil!==false; return !!pm[key];};
@@ -469,6 +470,21 @@ async function recomputeEtapa(leadId){
   if((etapa==='realizou'||etapa==='retorno')&&!l.realizado_em) upd.realizado_em=new Date().toISOString();
   await sb.from('leads').update(upd).eq('id',leadId);
 }
+// desmarca (cancela) um serviço: sai da agenda e a cliente volta pra Em conversa
+async function desmarcarServico(agId,leadId){
+  if(!confirm('Desmarcar esse serviço? O horário sai da agenda e a cliente volta pra "Em conversa".'))return;
+  const a=S.agendamentos.find(x=>x.id===agId);
+  try{if(a&&a.google_event_id)await sb.functions.invoke('agenda-sync',{body:{action:'delete',event_id:a.google_event_id}});}catch(_){}
+  await sb.from('agendamentos').update({status:'cancelado',google_event_id:null}).eq('id',agId);
+  await loadAll();
+  const rest=servicosDoLead(leadId);
+  if(!rest.some(x=>x.status==='marcado'||x.status==='realizado')){ await sb.from('leads').update({etapa:'conversa',atualizado_em:new Date().toISOString()}).eq('id',leadId); }
+  else { await recomputeEtapa(leadId); }
+  await loadAll();
+  document.querySelectorAll('.ov').forEach(o=>o.remove());
+  render();
+  if(leadId) openLead(leadId);
+}
 // marca UM serviço (agendamento) como realizado/faltou, de dentro do card
 async function marcarServico(agId,status,leadId){
   await sb.from('agendamentos').update({status,realizado_em:status==='realizado'?new Date().toISOString():null}).eq('id',agId);
@@ -503,8 +519,9 @@ function servicosBloco(id,closer){
     if(a.status==='marcado'){
       const ok=EL('button','qb ok','✓ Realizou');ok.onclick=()=>marcarServico(a.id,'realizado',id);
       const no=EL('button','qb no','✕ Faltou');no.onclick=()=>marcarServico(a.id,'faltou',id);
+      const dm=EL('button','qb','⊘ Desmarcar');dm.onclick=()=>desmarcarServico(a.id,id);
       const ed=EL('button','qb','Editar');ed.onclick=()=>{closer();openAgendamento(a,{})};
-      btns.appendChild(ok);btns.appendChild(no);btns.appendChild(ed);
+      btns.appendChild(ok);btns.appendChild(no);btns.appendChild(dm);btns.appendChild(ed);
     } else {
       const undo=EL('button','qb','↩ Desfazer');undo.onclick=()=>marcarServico(a.id,'marcado',id);
       const ed=EL('button','qb','Editar');ed.onclick=()=>{closer();openAgendamento(a,{})};
@@ -660,11 +677,12 @@ function viewPainel(){
   w.appendChild(rangeBar());
   if(isAdmin()||isSocia()){
     S.dashPro = S.dashPro||null;
-    // seletor: Geral ou a visão completa de uma profissional
+    if(S.dashPro && !canMoney(S.dashPro)) S.dashPro=null; // sócia não abre o dashboard da outra sócia
+    // seletor: Geral ou a visão de uma profissional (só as que você pode ver)
     const chips=EL('div','rangebar'); chips.style.marginTop='6px';
     const mk=(label,val)=>{const b=EL('button','qk'+(S.dashPro===val?' on':''),label);b.onclick=()=>{S.dashPro=val;render()};return b};
     chips.appendChild(mk('Geral',null));
-    S.pros.filter(p=>p.presta_servico!==false).forEach(p=>chips.appendChild(mk(p.nome,p.id)));
+    S.pros.filter(p=>p.presta_servico!==false && canMoney(p.id)).forEach(p=>chips.appendChild(mk(p.nome,p.id)));
     w.appendChild(chips);
     if(S.dashPro){
       const pro=proById(S.dashPro); const r=resumo(S.dashPro); const naoSocia=!pro.socia; const pct=pctPro(pro);
@@ -694,7 +712,7 @@ function viewPainel(){
     w.appendChild(g);
     const pan=EL('div','panel'); pan.appendChild(EL('h3',null,'Por profissional'));
     pan.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:-4px;font-size:12.5px',textContent:'Toque numa profissional pra ver tudo dela em detalhe.'}));
-    S.pros.filter(p=>p.presta_servico!==false).forEach(p=>{
+    S.pros.filter(p=>p.presta_servico!==false && canMoney(p.id)).forEach(p=>{
       const r=resumo(p.id); const row=EL('div','rowline'); row.style.cursor='pointer';
       const left=EL('div');const dot=EL('span','dot');dot.style.background=p.cor;dot.style.marginRight='8px';
       const nm=EL('span');nm.appendChild(dot);nm.appendChild(document.createTextNode(p.nome));left.appendChild(nm);
@@ -1207,23 +1225,46 @@ function viewMeta(){
       if(S.metaSel.size){const cl=EL('button','btn ghost sm','Limpar seleção');cl.onclick=()=>{S.metaSel.clear();drawList();paint()};h.appendChild(cl);}
       pan.appendChild(h);
       if(!items.length){pan.appendChild(EL('p','muted','Sem dados no período.'));return;}
+      S.metaOpen = S.metaOpen || new Set();
+      pan.appendChild(Object.assign(EL('p','hint'),{style:'margin:-2px 0 4px',textContent:'Toque numa para ver todas as métricas. A caixinha soma lá em cima.'}));
+      const metric=(label,val)=>{const dd=EL('div');dd.style.minWidth='0';dd.appendChild(Object.assign(EL('div','muted'),{textContent:label,style:'font-size:11px'}));dd.appendChild(Object.assign(EL('div'),{textContent:val,style:'font-weight:600;font-size:14px'}));return dd;};
+      const pct1=v=>(Number(v)||0).toFixed(1).replace('.',',')+'%';
+      const num2=v=>(Number(v)||0).toFixed(2).replace('.',',');
       items.forEach(c=>{
-        const key=selKey(c);const on=S.metaSel.has(key);
-        const row=EL('div','rowline');row.style.cursor='pointer';row.style.gap='10px';
-        if(on){row.style.background='var(--goldsoft)';row.style.borderRadius='8px';row.style.padding='8px 10px';}
+        const key=selKey(c);const on=S.metaSel.has(key);const open=S.metaOpen.has(key);
+        const wrap=EL('div');wrap.style.cssText='border-bottom:1px solid var(--line)';
+        const row=EL('div','row');row.style.cssText='gap:10px;cursor:pointer;align-items:center;padding:10px 0';
+        if(on){row.style.background='var(--goldsoft)';row.style.borderRadius='8px';row.style.padding='9px 10px';}
         const cb=document.createElement('input');cb.type='checkbox';cb.checked=on;cb.style.cssText='width:17px;height:17px;flex:0 0 auto;accent-color:var(--gold)';
         const left=EL('div');left.style.cssText='flex:1 1 auto;min-width:0';
         const l1=EL('div');l1.style.cssText='font-weight:600;font-size:14px;display:flex;align-items:center;gap:7px';
+        l1.appendChild(Object.assign(EL('span','mtchev'),{textContent:(open?'▾ ':'▸ ')}));
         l1.appendChild(Object.assign(EL('span'),{textContent:c.nome,style:'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
         const si=stInfo(c.status);if(si){const bb=EL('span');bb.textContent=si.t;bb.style.cssText='flex:0 0 auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#fff;background:'+si.bg+';padding:2px 7px;border-radius:999px';l1.appendChild(bb);}
         left.appendChild(l1);
-        left.appendChild(Object.assign(EL('div','muted'),{textContent:'alcance '+nMil(c.alcance)+' · '+nMil((c.conversas||0)+(c.leads||0))+' conversas · '+nMil(c.cliques)+' cliques',style:'font-size:12px'}));
+        left.appendChild(Object.assign(EL('div','muted'),{textContent:nMil(c.resultado)+' resultados · '+nMil(c.alcance)+' alcance',style:'font-size:12px;margin-left:16px'}));
         const val=Object.assign(EL('b','serif'),{textContent:fmt(c.gasto),style:'white-space:nowrap'});
-        const toggle=()=>{if(S.metaSel.has(key))S.metaSel.delete(key);else S.metaSel.add(key);drawList();paint()};
-        cb.onclick=ev=>{ev.stopPropagation();toggle()};
-        row.onclick=toggle;
+        cb.onclick=ev=>{ev.stopPropagation();if(S.metaSel.has(key))S.metaSel.delete(key);else S.metaSel.add(key);drawList();paint()};
+        row.onclick=()=>{if(open)S.metaOpen.delete(key);else S.metaOpen.add(key);drawList()};
         row.appendChild(cb);row.appendChild(left);row.appendChild(val);
-        pan.appendChild(row);
+        wrap.appendChild(row);
+        if(open){
+          const met=EL('div');met.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:11px 12px;padding:6px 2px 14px 2px';
+          met.appendChild(metric('Gasto',fmt(c.gasto)));
+          met.appendChild(metric('Resultado',nMil(c.resultado)));
+          met.appendChild(metric('Custo/result.',fmt(c.custo_resultado)));
+          met.appendChild(metric('Hook rate',pct1(c.hook)));
+          met.appendChild(metric('Hold rate',pct1(c.hold)));
+          met.appendChild(metric('Frequência',num2(c.frequencia)));
+          met.appendChild(metric('CTR',pct1(c.ctr)));
+          met.appendChild(metric('CPC',fmt(c.cpc)));
+          met.appendChild(metric('CPM',fmt(c.cpm)));
+          met.appendChild(metric('Conversas',nMil((c.conversas||0)+(c.leads||0))));
+          met.appendChild(metric('Cliques',nMil(c.cliques)));
+          met.appendChild(metric('Impressões',nMil(c.impressoes)));
+          wrap.appendChild(met);
+        }
+        pan.appendChild(wrap);
       });
     };
     box.appendChild(summary); box.appendChild(pan);
