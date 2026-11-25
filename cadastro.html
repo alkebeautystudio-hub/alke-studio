@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cadastro · Alke Beauty Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Outfit:wght@400;500;600;700&display=swap">
+<style>
+:root{--bg:#EFE4CE;--card:#FBF7EF;--ink:#332C23;--muted:#8a7f6d;--gold:#A8823A;--goldsoft:#efe2c6;--line:#e7dcc6;--line2:#d9ccb2}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Outfit,system-ui,sans-serif;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:max(18px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left))}
+.wrap{width:100%;max-width:440px;margin-top:22px}
+.brand{text-align:center;margin-bottom:6px}
+.brand .logo{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:38px;letter-spacing:.14em;color:var(--ink);line-height:1}
+.brand .logo b{color:var(--gold)}
+.brand .sub{font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px 20px 24px;box-shadow:0 18px 44px rgba(51,44,35,.12);margin-top:18px}
+h1{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:25px;margin:0 0 4px;text-align:center}
+.lead{text-align:center;color:var(--muted);font-size:13.5px;line-height:1.5;margin:0 0 18px}
+label{display:block;font-size:12.5px;font-weight:600;color:var(--ink);margin:14px 0 5px}
+label .opt{color:var(--muted);font-weight:400}
+input{width:100%;padding:12px 13px;border:1px solid var(--line2);border-radius:11px;background:#fff;color:var(--ink);font-size:16px;font-family:inherit}
+input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(168,130,58,.15)}
+.hint{font-size:11.5px;color:var(--muted);margin-top:4px}
+button{width:100%;margin-top:22px;padding:14px;border:none;border-radius:12px;background:var(--gold);color:#fff;font-size:16px;font-weight:600;font-family:inherit;cursor:pointer;transition:filter .12s}
+button:hover{filter:brightness(1.05)}
+button:disabled{opacity:.6;cursor:default}
+.gift{background:var(--goldsoft);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5;color:#6b5a32;margin-bottom:4px}
+.err{color:#b4452f;font-size:13px;margin-top:12px;text-align:center;min-height:16px}
+.ok{text-align:center;padding:14px 4px}
+.ok .big{font-size:46px}
+.ok h2{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:24px;margin:8px 0 6px}
+.ok p{color:var(--muted);font-size:14px;line-height:1.55;margin:0}
+.foot{text-align:center;font-size:11px;color:var(--muted);margin-top:16px;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><div class="logo">AL<b>K</b>E</div><div class="sub">Beauty Studio</div></div>
+  <div class="card" id="card">
+    <h1>Complete seu cadastro</h1>
+    <p class="lead">Leva 30 segundinhos — é pra te atender melhor e liberar condições exclusivas do studio. 💛</p>
+    <div class="gift">✨ Quem completa o cadastro entra na nossa lista de clientes com <b>mimos de aniversário</b> e <b>condições especiais</b>.</div>
+    <form id="form" autocomplete="on">
+      <label>Seu nome completo</label>
+      <input id="nome" type="text" placeholder="Nome e sobrenome" required>
+      <label>WhatsApp</label>
+      <input id="tel" type="tel" inputmode="numeric" placeholder="DDD + número" required>
+      <label>Instagram <span class="opt">(opcional)</span></label>
+      <input id="insta" type="text" placeholder="@seu.usuario">
+      <label>Data de nascimento</label>
+      <input id="nasc" type="date">
+      <div class="hint">É com isso que a gente te manda um mimo no seu dia 🎂</div>
+      <label>E-mail <span class="opt">(opcional)</span></label>
+      <input id="email" type="email" placeholder="seu@email.com">
+      <label>CPF <span class="opt">(opcional)</span></label>
+      <input id="cpf" type="text" inputmode="numeric" placeholder="só se quiser nota fiscal">
+      <button id="btn" type="submit">Enviar cadastro</button>
+      <div class="err" id="err"></div>
+    </form>
+  </div>
+  <div class="foot">Alke Beauty Studio · Santa Mônica · BH</div>
+</div>
+<script>
+const FN="https://rzgbzwczfdjhbheofwsz.supabase.co/functions/v1/cadastro";
+const qs=new URLSearchParams(location.search);
+const tel0=qs.get("tel")||qs.get("telefone")||"";
+if(tel0) document.getElementById("tel").value=tel0;
+const nome0=qs.get("nome"); if(nome0) document.getElementById("nome").value=nome0;
+const form=document.getElementById("form"),btn=document.getElementById("btn"),err=document.getElementById("err");
+form.addEventListener("submit",async(e)=>{
+  e.preventDefault(); err.textContent="";
+  const nome=document.getElementById("nome").value.trim();
+  const tel=document.getElementById("tel").value.trim();
+  if(!nome){err.textContent="Preenche seu nome, por favor.";return;}
+  if(tel.replace(/\D/g,"").length<10){err.textContent="Confere o WhatsApp (DDD + número).";return;}
+  btn.disabled=true; btn.textContent="Enviando…";
+  const body={nome,telefone:tel,instagram:document.getElementById("insta").value.trim(),nascimento:document.getElementById("nasc").value||null,email:document.getElementById("email").value.trim(),cpf:document.getElementById("cpf").value.trim()};
+  try{
+    const r=await fetch(FN,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||j.error) throw new Error(j.error||"erro");
+    document.getElementById("card").innerHTML='<div class="ok"><div class="big">💛</div><h2>Cadastro recebido!</h2><p>Prontinho, '+nome.split(" ")[0]+'. Já estamos com seus dados. Qualquer coisa a gente fala com você pelo WhatsApp. Até já!</p></div>';
+  }catch(_){
+    btn.disabled=false; btn.textContent="Enviar cadastro";
+    err.textContent="Ops, não consegui enviar agora. Tenta de novo em instantes.";
+  }
+});
+</script>
+</body>
+</html>
