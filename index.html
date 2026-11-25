@@ -153,9 +153,13 @@ a.lk{color:var(--gold);text-decoration:none;font-size:12.5px}
 . chip{}
 @media(max-width:820px){
   .shell{grid-template-columns:1fr}
-  .side{display:none}
-  .mtop{display:flex;gap:4px;overflow-x:auto;padding:10px 12px;background:var(--bg2);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
-  .mtop .nav{width:auto;white-space:nowrap;padding:8px 13px}
+  .side{position:fixed;left:0;top:0;height:100vh;width:252px;z-index:60;transform:translateX(-105%);transition:transform .22s ease;box-shadow:0 0 50px rgba(40,28,20,.3)}
+  .side.open{transform:translateX(0)}
+  .drawov{display:none;position:fixed;inset:0;background:rgba(40,28,20,.45);z-index:55}
+  .drawov.on{display:block}
+  .mtop{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  .mtop .burger{font-size:21px;background:none;border:none;color:var(--gold);cursor:pointer;line-height:1;padding:2px 4px}
+  .mtop .mlogo{font-family:var(--brand);font-size:23px;letter-spacing:.3em;color:var(--gold);font-weight:600;padding-left:.3em}
   .topbar h2{font-size:25px}
   .two{grid-template-columns:1fr}
   .srow{grid-template-columns:1fr 1fr;gap:6px}
@@ -187,6 +191,7 @@ a.lk{color:var(--gold);text-decoration:none;font-size:12.5px}
       <nav id="nav"></nav>
       <div class="who" id="who"></div>
     </aside>
+    <div class="drawov" id="drawov"></div>
     <div style="min-width:0">
       <div class="mtop" id="mtop"></div>
       <main class="content" id="view"></main>
@@ -259,19 +264,22 @@ const custoDe=l=>{const p=S.precos[l.servico_id];return p?Number(p.custo):0};
 const valorFinal=l=>{const pr=precoDe(l);return pr==null?null:pr-(Number(l.desconto)||0)};
 
 // ---------- SHELL ----------
+function openDrawer(){document.querySelector('.side')?.classList.add('open');document.getElementById('drawov')?.classList.add('on')}
+function closeDrawer(){document.querySelector('.side')?.classList.remove('open');document.getElementById('drawov')?.classList.remove('on')}
 function renderShell(){
-  const tabs=[['funil','Funil','◇'],['agenda','Agenda','▦'],['servicos','Serviços','✦'],['painel','Painel','◉']];
+  const tabs=[['meudia','Meu dia','☀'],['funil','Funil','◇'],['agenda','Agenda','▦'],['clientes','Clientes','♥'],['servicos','Serviços','✦'],['painel','Painel','◉']];
   if(isAdmin()) tabs.push(['equipe','Equipe','♛']);
   const nav=document.getElementById('nav'); nav.innerHTML='';
-  const mtop=document.getElementById('mtop'); mtop.innerHTML='';
   tabs.forEach(([k,l,ic])=>{
-    for(const host of [nav,mtop]){
-      const b=EL('button','nav'+(S.tab===k?' on':''));
-      b.innerHTML='<span class="ic">'+ic+'</span>'; b.appendChild(document.createTextNode(l));
-      b.onclick=()=>{S.tab=k;renderShell();render()};
-      host.appendChild(b);
-    }
+    const b=EL('button','nav'+(S.tab===k?' on':''));
+    b.innerHTML='<span class="ic">'+ic+'</span>'; b.appendChild(document.createTextNode(l));
+    b.onclick=()=>{S.tab=k;closeDrawer();renderShell();render()};
+    nav.appendChild(b);
   });
+  const mtop=document.getElementById('mtop'); mtop.innerHTML='';
+  const burger=EL('button','burger','☰'); burger.onclick=openDrawer; mtop.appendChild(burger);
+  mtop.appendChild(Object.assign(EL('div','mlogo'),{textContent:'ALKE'}));
+  const drawov=document.getElementById('drawov'); if(drawov) drawov.onclick=closeDrawer;
   const who=document.getElementById('who');
   who.innerHTML=''; const b=EL('b',null,S.me.nome||'—');
   const r=EL('div','muted',isAdmin()?'Administrador':(S.me.socia?'Sócia':'Profissional'));
@@ -284,10 +292,12 @@ function renderShell(){
 }
 function render(){
   const v=document.getElementById('view'); v.innerHTML='';
-  if(S.tab==='funil') v.appendChild(viewFunil());
+  if(S.tab==='meudia') v.appendChild(viewMeuDia());
+  else if(S.tab==='funil') v.appendChild(viewFunil());
+  else if(S.tab==='agenda') v.appendChild(viewAgenda());
+  else if(S.tab==='clientes') v.appendChild(viewClientes());
   else if(S.tab==='servicos') v.appendChild(viewServicos());
   else if(S.tab==='painel') v.appendChild(viewPainel());
-  else if(S.tab==='agenda') v.appendChild(viewAgenda());
   else if(S.tab==='equipe') v.appendChild(viewEquipe());
 }
 function pageHead(title,sub){
@@ -371,7 +381,7 @@ async function move(l,etapa){
 
 // ---------- LEAD MODAL ----------
 function openLead(id,prefill){
-  const l = id ? {...S.leads.find(x=>x.id===id)} : Object.assign({etapa:'lead',origem:'',servico_id:'',nome:'',telefone:'',nascimento:'',desconto:0,retorno:'',obs:'',proxima_acao:''}, prefill||{});
+  const l = id ? {...S.leads.find(x=>x.id===id)} : Object.assign({etapa:'lead',origem:'',servico_id:'',nome:'',telefone:'',nascimento:'',email:'',desconto:0,retorno:'',obs:'',proxima_acao:''}, prefill||{});
   let etapaVal=l.etapa||'lead';
   const m=EL('div','modal big'); m.appendChild(EL('h3',null,id?(l.nome||'Ficha da cliente'):'Nova cliente'));
   const pills=EL('div','stagepills');
@@ -381,6 +391,7 @@ function openLead(id,prefill){
   const nome=inp('text',l.nome,'Nome da cliente');
   const tel=inp('text',l.telefone,'DDD + número');
   const nasc=inp('date',l.nascimento||'');
+  const email=inp('email',l.email||'','e-mail (opcional)');
   const org=sel(ORIGENS.map(o=>[o,o]),l.origem,'— origem —');
   const serv=sel(S.servicos.map(s=>[s.id,s.nome+' · '+(proById(s.profissional_id).nome||'')]),l.servico_id,'— serviço —');
   const prox=inp('text',l.proxima_acao,'Ex: responder no WhatsApp');
@@ -395,7 +406,8 @@ function openLead(id,prefill){
     priceInfo.innerHTML='Preço do serviço: <b>'+fmt(p.preco)+'</b>'+(d>0?' − desconto = <b class="gold">'+fmt(final)+'</b>':'');
   };
   serv.onchange=refreshPrice; desc.oninput=refreshPrice;
-  m.appendChild(field('Nome',nome)); m.appendChild(field('WhatsApp',tel)); m.appendChild(field('Data de nascimento',nasc));
+  m.appendChild(field('Nome',nome)); m.appendChild(field('WhatsApp',tel));
+  const two0=EL('div','two'); two0.appendChild(field('Data de nascimento',nasc)); two0.appendChild(field('E-mail',email)); m.appendChild(two0);
   m.appendChild(field('Origem',org)); m.appendChild(field('Serviço',serv));
   m.appendChild(field('Próxima ação',prox));
   m.appendChild(field('Desconto (R$), se teve',desc)); m.appendChild(priceInfo); refreshPrice();
@@ -420,7 +432,7 @@ function openLead(id,prefill){
   const save=EL('button','btn','Salvar');
   save.onclick=async()=>{
     const proId=servById(serv.value).profissional_id||l.profissional_id||S.me.id;
-    const data={nome:nome.value.trim(),telefone:tel.value.trim(),nascimento:nasc.value||null,origem:org.value,servico_id:serv.value||null,
+    const data={nome:nome.value.trim(),telefone:tel.value.trim(),nascimento:nasc.value||null,email:email.value.trim()||null,origem:org.value,servico_id:serv.value||null,
       profissional_id:proId,etapa:etapaVal,proxima_acao:prox.value.trim()||null,desconto:Number(desc.value)||0,retorno:ret.value||null,obs:obs.value.trim(),
       atualizado_em:new Date().toISOString()};
     if(etapaVal==='realizou') data.realizado_em = l.realizado_em || new Date().toISOString();
@@ -780,6 +792,62 @@ function openAgendamento(ag,prefill){
   };
   act.appendChild(cancel);act.appendChild(save);m.appendChild(act);
   const ov=overlay(m); nome.focus();
+}
+// ---------- MEU DIA ----------
+function viewMeuDia(){
+  const w=EL('div'); const hoje=new Date().toISOString().slice(0,10);
+  w.appendChild(pageHead('Meu dia', brDate(hoje,{weekday:'long',day:'2-digit',month:'long'})));
+  const base = isAdmin() ? S.agendamentos : S.agendamentos.filter(a=>a.profissional_id===S.me.id);
+  const todays = base.filter(a=>a.inicio && a.inicio.slice(0,10)===hoje && a.status!=='cancelado').sort((a,b)=>new Date(a.inicio)-new Date(b.inicio));
+  const pan=EL('div','panel'); pan.style.marginTop='14px';
+  if(!todays.length){pan.appendChild(Object.assign(EL('div','empty'),{textContent:'Nenhum atendimento hoje. Quando agendar, aparece aqui.'}));w.appendChild(pan);return w;}
+  todays.forEach(a=>{
+    const pro=proById(a.profissional_id), sv=servById(a.servico_id);
+    const row=EL('div','rowline'); row.style.gap='12px';
+    const l=EL('div','row'); l.style.gap='14px';
+    l.appendChild(Object.assign(EL('b','serif'),{textContent:hhmm(new Date(a.inicio)),style:'font-size:19px;min-width:54px'}));
+    const info=EL('div');
+    info.appendChild(Object.assign(EL('div'),{textContent:a.cliente_nome||'Cliente',style:'font-weight:600;font-size:15px'}));
+    info.appendChild(Object.assign(EL('div','muted'),{textContent:(sv.nome||'procedimento')+(isAdmin()&&pro.nome?' · '+pro.nome:''),style:'font-size:12.5px'}));
+    l.appendChild(info); row.appendChild(l);
+    const dot=EL('span','dot');dot.style.cssText='background:'+(pro.cor||'var(--gold)')+';width:12px;height:12px';row.appendChild(dot);
+    pan.appendChild(row);
+  });
+  w.appendChild(pan);
+  w.appendChild(Object.assign(EL('p','hint'),{style:'margin-top:8px',textContent:'Resumo do seu dia — atualiza sozinho conforme os agendamentos entram.'}));
+  return w;
+}
+// ---------- CLIENTES ----------
+function viewClientes(){
+  const w=EL('div'); w.appendChild(pageHead('Clientes'));
+  const search=document.createElement('input'); search.type='text'; search.placeholder='Buscar por nome ou telefone';
+  search.style.cssText='width:100%;max-width:340px;padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--surface);color:var(--ink);margin-top:6px';
+  w.appendChild(search);
+  const map={};
+  S.leads.forEach(l=>{const key=(l.telefone||'').replace(/\D/g,'')||('n:'+(l.nome||'').toLowerCase());if(!key)return;if(!map[key])map[key]={nome:l.nome,telefone:l.telefone,nascimento:l.nascimento,email:l.email,origem:l.origem,leads:[]};map[key].leads.push(l);if(l.nascimento&&!map[key].nascimento)map[key].nascimento=l.nascimento;if(l.email&&!map[key].email)map[key].email=l.email;});
+  const list=EL('div','panel'); list.style.marginTop='12px';
+  const draw=()=>{
+    list.innerHTML='';
+    const q=search.value.trim().toLowerCase();
+    const arr=Object.values(map).filter(c=>!q||(c.nome||'').toLowerCase().includes(q)||(c.telefone||'').includes(q)).sort((a,b)=>(a.nome||'').localeCompare(b.nome||''));
+    if(!arr.length){list.appendChild(Object.assign(EL('div','empty'),{textContent:'Nenhuma cliente ainda.'}));return;}
+    arr.forEach(c=>{
+      const realizados=c.leads.filter(l=>l.etapa==='realizou').length;
+      const row=EL('div','rowline'); row.style.cursor='pointer';
+      const left=EL('div');
+      left.appendChild(Object.assign(EL('div'),{textContent:c.nome||'—',style:'font-weight:600'}));
+      const sub=[c.telefone,c.nascimento?('🎂 '+brDate(c.nascimento,{day:'2-digit',month:'2-digit'})):'',c.email,c.origem].filter(Boolean).join(' · ');
+      left.appendChild(Object.assign(EL('div','muted'),{textContent:sub||'—',style:'font-size:12.5px'}));
+      row.appendChild(left);
+      row.appendChild(Object.assign(EL('span','muted'),{textContent:realizados+' atend.',style:'font-size:12.5px;white-space:nowrap'}));
+      row.onclick=()=>{const last=[...c.leads].sort((a,b)=>(b.criado_em||'').localeCompare(a.criado_em||''))[0];openLead(last.id)};
+      list.appendChild(row);
+    });
+  };
+  search.oninput=draw; draw();
+  w.appendChild(list);
+  w.appendChild(Object.assign(EL('p','hint'),{style:'margin-top:8px',textContent:'Toque numa cliente pra ver a ficha completa e o histórico. Agrupadas por telefone (sem duplicar).'}));
+  return w;
 }
 // ---------- EQUIPE (admin) ----------
 function viewEquipe(){
