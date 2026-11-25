@@ -6,14 +6,14 @@
 <title>Alke Beauty Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600;700&family=Cormorant:ital@1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#EFE4CE; --bg2:#E8DBC0; --surface:#FAF4E6; --surface2:#F4EAD4;
   --ink:#332C23; --muted:#8C7E65; --gold:#A8823A; --gold2:#C19A4C; --goldsoft:#EADFC4;
   --line:#E2D4B8; --line2:#D8C7A4; --wine:#7A4A52;
   --win:#5B8C5A; --warn:#C08A2E; --alert:#B5544E;
-  --disp:'Cormorant Garamond',Georgia,serif; --body:'Inter',system-ui,sans-serif;
+  --disp:'Outfit','Inter',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif; --brand:'Cormorant Garamond',Georgia,serif;
   --shadow:0 1px 2px rgba(51,44,35,.05),0 10px 30px rgba(51,44,35,.07);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
@@ -41,7 +41,7 @@ button{cursor:pointer}
 /* ====== LOGIN ====== */
 #login{min-height:100%;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 50% -10%,var(--surface),var(--bg) 60%)}
 .loginbox{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:36px 30px;text-align:center}
-.wordmark{font-family:var(--disp);font-size:34px;letter-spacing:.32em;color:var(--gold);font-weight:600;padding-left:.32em}
+.wordmark{font-family:var(--brand);font-size:38px;letter-spacing:.32em;color:var(--gold);font-weight:600;padding-left:.32em}
 .wordmark small{display:block;font-size:11px;letter-spacing:.42em;color:var(--muted);margin-top:4px;padding-left:.42em;font-family:var(--body);font-weight:500}
 .arc{width:70px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:18px auto 22px}
 #login input{width:100%;padding:13px 14px;border:1px solid var(--line2);border-radius:11px;background:var(--bg);color:var(--ink);margin-bottom:11px}
@@ -56,7 +56,7 @@ button{cursor:pointer}
 #app{display:none;min-height:100%}
 .shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
 .side{background:var(--bg2);border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
-.side .mark{font-family:var(--disp);font-size:22px;letter-spacing:.28em;color:var(--gold);font-weight:600;padding:6px 10px 2px .28em}
+.side .mark{font-family:var(--brand);font-size:24px;letter-spacing:.28em;color:var(--gold);font-weight:600;padding:6px 10px 2px .28em}
 .side .mark small{display:block;font-family:var(--body);font-size:9px;letter-spacing:.38em;color:var(--muted);font-weight:500;padding-left:.1em}
 .navsep{height:1px;background:var(--line);margin:12px 6px}
 .nav{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--ink);border:none;background:none;width:100%;text-align:left;font-weight:500;font-size:14px}
@@ -119,6 +119,14 @@ button{cursor:pointer}
 .agwrap{margin-top:14px;display:flex;overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
 .agcol{min-width:148px;flex:1;border-right:1px solid var(--line)}
 .agcol.agtime{flex:0 0 48px;min-width:48px}
+.agcol.wk{min-width:92px}
+.rangebar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.rangebar input{padding:8px 9px;border:1px solid var(--line2);border-radius:9px;background:var(--surface);color:var(--ink);font-size:13px}
+.rangebar .qk{border:1px solid var(--line2);background:var(--surface);color:var(--muted);border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer}
+.rangebar .qk.on{background:var(--gold);color:#fff;border-color:var(--gold)}
+.segtog{display:inline-flex;border:1px solid var(--line2);border-radius:999px;overflow:hidden}
+.segtog button{border:none;padding:6px 14px;font-weight:600;font-size:13px;cursor:pointer;background:transparent;color:var(--muted)}
+.segtog button.on{background:var(--gold);color:#fff}
 .agcol:last-child{border-right:none}
 .agh{background:var(--surface2);border-bottom:1px solid var(--line);padding:8px 6px;text-align:center;font-weight:600;font-size:12.5px;height:38px;white-space:nowrap;overflow:hidden}
 .agbody{position:relative}
@@ -199,7 +207,9 @@ const ORIGENS=["Instagram (anúncio)","Instagram (orgânico)","Indicação","Wha
 const ETAPAS=[{k:'lead',l:'Lead'},{k:'conversa',l:'Em conversa'},{k:'followup',l:'Follow-up'},{k:'agendada',l:'Agendada'},{k:'realizou',l:'Realizou'},{k:'naoveio',l:'Não veio'}];
 const monthKey=d=>{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')};
 
-const S={me:null,pros:[],servicos:[],precos:{},leads:[],fin:{},config:{custo_total_mes:0},despesas:[],agendamentos:[],agDay:new Date().toISOString().slice(0,10),tab:'funil',month:monthKey(Date.now())};
+const _mStart=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10);
+const _mEnd=new Date(new Date().getFullYear(),new Date().getMonth()+1,0).toISOString().slice(0,10);
+const S={me:null,pros:[],servicos:[],precos:{},leads:[],fin:{},config:{custo_total_mes:0},despesas:[],agendamentos:[],agDay:new Date().toISOString().slice(0,10),agView:'dia',dashFrom:_mStart,dashTo:_mEnd,tab:'funil',month:monthKey(Date.now())};
 
 // ---------- AUTH ----------
 document.getElementById('loginform').addEventListener('submit',async e=>{
@@ -483,8 +493,10 @@ function openServ(id){
 }
 
 // ---------- PAINEL ----------
+const inRange=d=>{const x=(d||'').slice(0,10);return x>=S.dashFrom && x<=S.dashTo};
+function mesesNoRange(){const set=new Set();let [y,m]=S.dashFrom.slice(0,7).split('-').map(Number);const end=S.dashTo.slice(0,7);while(true){const k=y+'-'+String(m).padStart(2,'0');set.add(k);if(k>=end)break;m++;if(m>12){m=1;y++}if(set.size>60)break}return set}
 function vendasMes(proId){
-  return S.leads.filter(l=>l.etapa==='realizou' && valorFinal(l)!=null && monthKey(l.realizado_em||l.criado_em)===S.month && (!proId||l.profissional_id===proId));
+  return S.leads.filter(l=>l.etapa==='realizou' && valorFinal(l)!=null && inRange(l.realizado_em||l.criado_em) && (!proId||l.profissional_id===proId));
 }
 function resumo(proId){
   const v=vendasMes(proId); const fat=v.reduce((s,l)=>s+(valorFinal(l)||0),0);
@@ -493,7 +505,7 @@ function resumo(proId){
 }
 function viewPainel(){
   const w=EL('div'); w.appendChild(pageHead('Painel', S.me.nome));
-  w.appendChild(monthNav());
+  w.appendChild(rangeBar());
   if(isAdmin()){
     // visão geral
     let fatT=0; vendasMes().forEach(l=>fatT+=valorFinal(l)||0);
@@ -536,19 +548,30 @@ function viewPainel(){
   w.appendChild(aniversariantesPanel());
   return w;
 }
-function monthNav(){
-  const n=EL('div');n.style.cssText='display:flex;align-items:center;gap:12px;margin-top:14px';
-  const prev=EL('button','btn ghost sm','‹');prev.onclick=()=>{const[y,m]=S.month.split('-').map(Number);S.month=monthKey(new Date(y,m-2,1));render()};
-  const next=EL('button','btn ghost sm','›');next.onclick=()=>{const[y,m]=S.month.split('-').map(Number);S.month=monthKey(new Date(y,m,1));render()};
-  const lab=EL('b','serif',new Date(S.month+'-01').toLocaleDateString('pt-BR',{month:'long',year:'numeric'}));
-  lab.style.cssText='font-size:18px;text-transform:capitalize;min-width:160px;text-align:center';
-  n.appendChild(prev);n.appendChild(lab);n.appendChild(next);return n;
+function rangeBar(){
+  const bar=EL('div','rangebar');
+  const now=new Date();
+  const fmtd=d=>d.toISOString().slice(0,10);
+  const presets=[
+    ['Este mês', fmtd(new Date(now.getFullYear(),now.getMonth(),1)), fmtd(new Date(now.getFullYear(),now.getMonth()+1,0))],
+    ['Mês passado', fmtd(new Date(now.getFullYear(),now.getMonth()-1,1)), fmtd(new Date(now.getFullYear(),now.getMonth(),0))],
+    ['7 dias', fmtd(new Date(Date.now()-6*864e5)), fmtd(now)],
+    ['30 dias', fmtd(new Date(Date.now()-29*864e5)), fmtd(now)],
+    ['Este ano', now.getFullYear()+'-01-01', now.getFullYear()+'-12-31'],
+  ];
+  presets.forEach(([l,f,t])=>{const b=EL('button','qk'+(S.dashFrom===f&&S.dashTo===t?' on':''),l);b.onclick=()=>{S.dashFrom=f;S.dashTo=t;render()};bar.appendChild(b)});
+  bar.appendChild(Object.assign(EL('span','muted'),{textContent:'De',style:'font-size:13px;margin-left:4px'}));
+  const de=inp('date',S.dashFrom); de.onchange=()=>{S.dashFrom=de.value;render()}; bar.appendChild(de);
+  bar.appendChild(Object.assign(EL('span','muted'),{textContent:'até',style:'font-size:13px'}));
+  const ate=inp('date',S.dashTo); ate.onchange=()=>{S.dashTo=ate.value;render()}; bar.appendChild(ate);
+  return bar;
 }
 function tile(k,v,cls){const t=EL('div','tile');t.appendChild(EL('div','k',k));t.appendChild(Object.assign(EL('div','v'+(cls?' '+cls:'')),{textContent:v}));return t}
 function caixa(){
   let entradas=0; vendasMes().forEach(l=>{const p=proById(l.profissional_id);if(!p.socia)entradas+=(valorFinal(l)||0)*0.30});
-  const gastos=S.despesas.filter(d=>monthKey(d.mes)===S.month).reduce((s,d)=>s+(Number(d.valor)||0),0);
-  const fixo=Number(S.config.custo_total_mes)||0;
+  const meses=mesesNoRange();
+  const gastos=S.despesas.filter(d=>meses.has(monthKey(d.mes))).reduce((s,d)=>s+(Number(d.valor)||0),0);
+  const fixo=(Number(S.config.custo_total_mes)||0)*meses.size;
   return {entradas,fixo,gastos,saldo:entradas-fixo-gastos};
 }
 function caixaPanel(){
@@ -562,10 +585,10 @@ function caixaPanel(){
   p.appendChild(g); return p;
 }
 function despesasPanel(){
-  const p=EL('div','panel'); const h=EL('div','listhead');h.appendChild(EL('h3',null,'Gastos do mês'));
+  const p=EL('div','panel'); const h=EL('div','listhead');h.appendChild(EL('h3',null,'Gastos do período'));
   const add=EL('button','btn ghost sm','+ Gasto');add.onclick=()=>openDespesa();h.appendChild(add);p.appendChild(h);
   p.appendChild(EL('p','muted','Cada sócia lança o que pagou do bolso. No fim, o sistema mostra quem deve pra quem.'));
-  const mine=S.despesas.filter(d=>monthKey(d.mes)===S.month);
+  const _mr=mesesNoRange(); const mine=S.despesas.filter(d=>_mr.has(monthKey(d.mes)));
   // por sócia
   const socias=S.pros.filter(p=>p.socia);
   const tot={}; socias.forEach(s=>tot[s.id]=0);
@@ -606,14 +629,14 @@ function openDespesa(){
   m.appendChild(field('Descrição',desc));m.appendChild(field('Valor',val));
   const act=EL('div','mactions');const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
   const save=EL('button','btn','Salvar');
-  save.onclick=async()=>{await sb.from('despesas').insert({profissional_id:S.me.id,descricao:desc.value.trim(),valor:Number(val.value)||0,mes:S.month+'-01'});ov.remove();await loadAll();render()};
+  save.onclick=async()=>{await sb.from('despesas').insert({profissional_id:S.me.id,descricao:desc.value.trim(),valor:Number(val.value)||0,mes:new Date().toISOString().slice(0,7)+'-01'});ov.remove();await loadAll();render()};
   act.appendChild(cancel);act.appendChild(save);m.appendChild(act);const ov=overlay(m);desc.focus();
 }
 
 function aniversariantesPanel(){
-  const mesNum=Number(S.month.split('-')[1]);
-  const bdays=S.leads.filter(l=>l.nascimento && (new Date(l.nascimento).getUTCMonth()+1)===mesNum);
-  const p=EL('div','panel'); p.appendChild(EL('h3',null,'🎂 Aniversariantes do mês'));
+  const mesesNum=new Set([...mesesNoRange()].map(k=>Number(k.split('-')[1])));
+  const bdays=S.leads.filter(l=>l.nascimento && mesesNum.has(new Date(l.nascimento).getUTCMonth()+1));
+  const p=EL('div','panel'); p.appendChild(EL('h3',null,'🎂 Aniversariantes do período'));
   if(!bdays.length){p.appendChild(EL('p','muted','Ninguém faz aniversário neste mês (ou faltam datas de nascimento nas fichas).'));return p;}
   bdays.sort((a,b)=>new Date(a.nascimento).getUTCDate()-new Date(b.nascimento).getUTCDate());
   bdays.forEach(l=>{const row=EL('div','rowline');
@@ -628,45 +651,75 @@ function aniversariantesPanel(){
 const AG0=8, AG1=20, HPX=54;
 const hhmm=dt=>String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
 const addDays=(d,n)=>{const x=new Date(d+'T00:00:00');x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+const mondayOf=d=>{const x=new Date(d+'T00:00:00');const wd=(x.getDay()+6)%7;x.setDate(x.getDate()-wd);return x.toISOString().slice(0,10)};
+const brDate=(d,opt)=>new Date(d+'T00:00:00').toLocaleDateString('pt-BR',opt);
 function viewAgenda(){
   const w=EL('div'); w.appendChild(pageHead('Agenda'));
+  const sem=S.agView==='semana';
   const bar=EL('div','row'); bar.style.cssText='gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center';
-  const prev=EL('button','btn ghost sm','‹');prev.onclick=()=>{S.agDay=addDays(S.agDay,-1);render()};
-  const next=EL('button','btn ghost sm','›');next.onclick=()=>{S.agDay=addDays(S.agDay,1);render()};
+  const prev=EL('button','btn ghost sm','‹');prev.onclick=()=>{S.agDay=addDays(S.agDay,sem?-7:-1);render()};
+  const next=EL('button','btn ghost sm','›');next.onclick=()=>{S.agDay=addDays(S.agDay,sem?7:1);render()};
   const hoje=EL('button','btn ghost sm','Hoje');hoje.onclick=()=>{S.agDay=new Date().toISOString().slice(0,10);render()};
-  const lab=EL('b','serif',new Date(S.agDay+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'}));
-  lab.style.cssText='font-size:17px;text-transform:capitalize;min-width:180px;text-align:center';
-  const add=EL('button','btn','+ Agendar');add.style.marginLeft='auto';add.onclick=()=>openAgendamento(null,{});
-  [prev,lab,next,hoje,add].forEach(e=>bar.appendChild(e)); w.appendChild(bar);
+  const lab=EL('b'); lab.style.cssText='font-size:16px;min-width:170px;text-align:center;font-weight:600';
+  if(sem){const s=mondayOf(S.agDay);lab.textContent=brDate(s,{day:'2-digit',month:'short'})+' – '+brDate(addDays(s,6),{day:'2-digit',month:'short'});}
+  else {lab.textContent=brDate(S.agDay,{weekday:'long',day:'2-digit',month:'long'});lab.style.textTransform='capitalize';}
+  const tog=EL('div','segtog');
+  [['dia','Dia'],['semana','Semana']].forEach(([k,l])=>{const b=EL('button',S.agView===k?'on':'',l);b.onclick=()=>{S.agView=k;render()};tog.appendChild(b)});
+  const add=EL('button','btn','+ Agendar'); add.onclick=()=>openAgendamento(null,{});
+  [prev,lab,next,hoje,tog].forEach(e=>bar.appendChild(e));
+  const sp=EL('div');sp.style.marginLeft='auto';bar.appendChild(sp);bar.appendChild(add);
+  w.appendChild(bar);
   const pros=S.pros.filter(p=>p.presta_servico!==false);
   if(!pros.length){w.appendChild(Object.assign(EL('div','muted'),{style:'margin-top:14px',textContent:'Cadastre profissionais na aba Equipe primeiro.'}));return w;}
-  const dayAgs=S.agendamentos.filter(a=>a.inicio && a.inicio.slice(0,10)===S.agDay && a.status!=='cancelado');
-  const wrap=EL('div','agwrap');
+  w.appendChild(sem?agWeek(pros):agDay(pros));
+  w.appendChild(Object.assign(EL('p','hint'),{style:'margin-top:8px',textContent:'Toque num horário vazio pra agendar. O sistema avisa se cair em cima de outra cliente.'}));
+  return w;
+}
+function agGridTime(){
   const tc=EL('div','agcol agtime'); tc.appendChild(EL('div','agh'));
-  const tb=EL('div','agbody'); for(let h=AG0;h<AG1;h++)tb.appendChild(Object.assign(EL('div','aglabel'),{textContent:String(h).padStart(2,'0')+'h'})); tc.appendChild(tb); wrap.appendChild(tc);
+  const tb=EL('div','agbody'); for(let h=AG0;h<AG1;h++)tb.appendChild(Object.assign(EL('div','aglabel'),{textContent:String(h).padStart(2,'0')+'h'})); tc.appendChild(tb); return tc;
+}
+function agBlock(a,narrow){
+  const p=proById(a.profissional_id);const st=new Date(a.inicio),ft=a.fim?new Date(a.fim):new Date(st.getTime()+1800000);
+  const blk=EL('div','agblk');
+  blk.style.top=(((st.getHours()+st.getMinutes()/60)-AG0)*HPX)+'px';
+  blk.style.height=Math.max(narrow?16:22,((ft-st)/3600000)*HPX)+'px';
+  blk.style.background='color-mix(in srgb,'+(p.cor||'#A8823A')+' 15%, var(--surface))';
+  blk.style.borderLeftColor=p.cor||'#A8823A'; if(narrow)blk.style.fontSize='10.5px';
+  blk.appendChild(Object.assign(EL('b'),{textContent:hhmm(st)+' '+(a.cliente_nome||'Cliente')}));
+  if(!narrow)blk.appendChild(document.createTextNode(servById(a.servico_id).nome||''));
+  return blk;
+}
+function agDay(pros){
+  const dayAgs=S.agendamentos.filter(a=>a.inicio && a.inicio.slice(0,10)===S.agDay && a.status!=='cancelado');
+  const wrap=EL('div','agwrap'); wrap.appendChild(agGridTime());
   pros.forEach(p=>{
     const col=EL('div','agcol');
     const hh=EL('div','agh'); const dot=EL('span','dot');dot.style.cssText='background:'+(p.cor||'#A8823A')+';display:inline-block;margin-right:6px';hh.appendChild(dot);hh.appendChild(document.createTextNode(p.nome));col.appendChild(hh);
     const body=EL('div','agbody'); body.style.height=((AG1-AG0)*HPX)+'px';
     for(let h=AG0;h<AG1;h++)body.appendChild(EL('div','aghour'));
     body.onclick=ev=>{if(ev.target!==body)return;const r=body.getBoundingClientRect();const mins=Math.max(0,Math.round(((ev.clientY-r.top)/HPX)*60/15)*15);openAgendamento(null,{profissional_id:p.id,hora:String(AG0+Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0')})};
-    dayAgs.filter(a=>a.profissional_id===p.id).forEach(a=>{
-      const st=new Date(a.inicio), ft=a.fim?new Date(a.fim):new Date(st.getTime()+1800000);
-      const blk=EL('div','agblk');
-      blk.style.top=(((st.getHours()+st.getMinutes()/60)-AG0)*HPX)+'px';
-      blk.style.height=Math.max(22,((ft-st)/3600000)*HPX)+'px';
-      blk.style.background='color-mix(in srgb,'+(p.cor||'#A8823A')+' 15%, var(--surface))';
-      blk.style.borderLeftColor=p.cor||'#A8823A';
-      blk.appendChild(Object.assign(EL('b'),{textContent:hhmm(st)+' '+(a.cliente_nome||'Cliente')}));
-      blk.appendChild(document.createTextNode(servById(a.servico_id).nome||''));
-      blk.onclick=ev=>{ev.stopPropagation();openAgendamento(a,{})};
-      body.appendChild(blk);
-    });
+    dayAgs.filter(a=>a.profissional_id===p.id).forEach(a=>{const blk=agBlock(a,false);blk.onclick=ev=>{ev.stopPropagation();openAgendamento(a,{})};body.appendChild(blk);});
     col.appendChild(body); wrap.appendChild(col);
   });
-  w.appendChild(wrap);
-  w.appendChild(Object.assign(EL('p','hint'),{style:'margin-top:8px',textContent:'Toque num horário vazio pra agendar, ou use + Agendar. O sistema avisa se cair em cima de outra cliente.'}));
-  return w;
+  return wrap;
+}
+function agWeek(pros){
+  const start=mondayOf(S.agDay); const today=new Date().toISOString().slice(0,10);
+  const wrap=EL('div','agwrap'); wrap.appendChild(agGridTime());
+  for(let i=0;i<7;i++){
+    const day=addDays(start,i); const col=EL('div','agcol wk');
+    const hh=EL('div','agh'); if(day===today)hh.style.color='var(--gold)';
+    const dd=new Date(day+'T00:00:00');
+    hh.textContent=dd.toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','')+' '+String(dd.getDate()).padStart(2,'0');
+    col.appendChild(hh);
+    const body=EL('div','agbody'); body.style.height=((AG1-AG0)*HPX)+'px'; if(day===today)body.style.background='color-mix(in srgb,var(--gold) 6%,transparent)';
+    for(let h=AG0;h<AG1;h++)body.appendChild(EL('div','aghour'));
+    body.onclick=ev=>{if(ev.target!==body)return;const r=body.getBoundingClientRect();const mins=Math.max(0,Math.round(((ev.clientY-r.top)/HPX)*60/15)*15);S.agDay=day;openAgendamento(null,{hora:String(AG0+Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0')})};
+    S.agendamentos.filter(a=>a.inicio&&a.inicio.slice(0,10)===day&&a.status!=='cancelado').forEach(a=>{const blk=agBlock(a,true);blk.onclick=ev=>{ev.stopPropagation();S.agDay=day;openAgendamento(a,{})};body.appendChild(blk);});
+    col.appendChild(body); wrap.appendChild(col);
+  }
+  return wrap;
 }
 function openAgendamento(ag,prefill){
   prefill=prefill||{}; const isEdit=!!ag;
