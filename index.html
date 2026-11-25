@@ -1200,6 +1200,7 @@ function viewMeta(){
     S.metaSel=S.metaSel||new Set();
     const selKey=c=>c.id||c.nome;
     const titNiv=S.metaLevel==='ad'?'anúncio':S.metaLevel==='adset'?'conjunto':'campanha';
+    const objLabel={CONVERSATIONS:'conversas',PROFILE_AND_PAGE_ENGAGEMENT:'engajamento',POST_ENGAGEMENT:'engajamento',PAGE_LIKES:'curtidas',LINK_CLICKS:'cliques no link',LANDING_PAGE_VIEWS:'views da página',LEAD_GENERATION:'leads',QUALITY_LEAD:'leads',THRUPLAY:'ThruPlay',VIDEO_VIEWS:'views de vídeo',REACH:'alcance',IMPRESSIONS:'impressões'};
     const stInfo=s=>{const u=(s||'').toUpperCase();if(u==='ACTIVE')return{t:'ativa',bg:'var(--win)'};if(u.indexOf('PAUSED')>=0)return{t:'pausada',bg:'var(--muted)'};if(!s)return null;return{t:u.toLowerCase().replace(/_/g,' '),bg:'var(--muted)'};};
     const periodo='Período: '+brDate(S.dashFrom,{day:'2-digit',month:'2-digit'})+' a '+brDate(S.dashTo,{day:'2-digit',month:'2-digit'});
     const summary=EL('div'); const pan=EL('div','panel');
@@ -1218,6 +1219,22 @@ function viewMeta(){
       const rb=EL('div'); rb.style.cssText='margin:12px 0 0;padding:13px 15px;border-radius:12px;background:var(--goldsoft);font-size:14px;line-height:1.5';
       rb.innerHTML='Gasto <b>'+fmt(t.gasto)+'</b> e faturamento do studio <b>'+fmt(fat)+'</b> no período.'+(t.gasto>0?(' Pra cada R$1 no tráfego, <b>'+roas.toFixed(1).replace('.',',')+'x</b> de volta.'):'');
       summary.appendChild(rb);
+      // Seguidores (digitado do Meta) + custo por seguidor (o Meta não entrega isso pela API)
+      const seg=Number(S.config.ig_seguidores)||0;
+      const sb2=EL('div','panel'); sb2.style.marginTop='12px';
+      const sh=EL('div','listhead'); sh.appendChild(EL('div','eyebrow','Seguidores no Instagram'));
+      sb2.appendChild(sh);
+      sb2.appendChild(Object.assign(EL('p','muted'),{style:'font-size:12px;margin-top:2px',textContent:'O Meta não manda esse número pela API — digite o que aparece no seu Meta no período que você está vendo.'}));
+      const sr=EL('div','row'); sr.style.cssText='gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap';
+      sr.appendChild(Object.assign(EL('span','muted'),{textContent:'Seguidores:',style:'font-size:13px'}));
+      const si=document.createElement('input'); si.type='number'; si.value=seg||''; si.placeholder='0';
+      si.style.cssText='max-width:110px;padding:9px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';
+      si.onchange=async()=>{S.config.ig_seguidores=Number(si.value)||0;try{await sb.from('studio_config').update({ig_seguidores:S.config.ig_seguidores}).eq('id',1);}catch(_){}paint();};
+      sr.appendChild(si);
+      const cps=seg>0?(t.gasto/seg):0;
+      sr.appendChild(Object.assign(EL('b','serif'),{textContent: seg>0?('custo por seguidor: '+fmt(cps)):'(digite os seguidores pra ver o custo)',style:'margin-left:6px;'+(seg>0?'color:var(--gold)':'font-weight:400;color:var(--muted);font-size:13px')}));
+      sb2.appendChild(sr);
+      summary.appendChild(sb2);
     };
     const drawList=()=>{
       pan.innerHTML='';
@@ -1251,7 +1268,7 @@ function viewMeta(){
         if(open){
           const met=EL('div');met.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:11px 12px;padding:6px 2px 14px 2px';
           met.appendChild(metric('Gasto',fmt(c.gasto)));
-          met.appendChild(metric('Resultado',nMil(c.resultado)));
+          met.appendChild(metric('Resultado'+(objLabel[c.objetivo]?' ('+objLabel[c.objetivo]+')':''),nMil(c.resultado)));
           met.appendChild(metric('Custo/result.',fmt(c.custo_resultado)));
           met.appendChild(metric('Hook rate',pct1(c.hook)));
           met.appendChild(metric('Hold rate',pct1(c.hold)));
