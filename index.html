@@ -471,10 +471,17 @@ function openLead(id,prefill){
       const stt=EL('span','tag '+(a.status==='realizado'?'money':a.status==='faltou'?'al':'org'),statusLabel(a.status));
       topr.appendChild(stt); row.appendChild(topr);
       const btns=EL('div','qa'); btns.style.marginTop='9px';
-      const ok=EL('button','qb ok','✓ Realizou');ok.onclick=()=>marcarServico(a.id,'realizado',id);
-      const no=EL('button','qb no','✕ Faltou');no.onclick=()=>marcarServico(a.id,'faltou',id);
-      const ed=EL('button','qb','Editar');ed.onclick=()=>{ov.remove();openAgendamento(a,{})};
-      btns.appendChild(ok);btns.appendChild(no);btns.appendChild(ed);
+      if(a.status==='marcado'){
+        const ok=EL('button','qb ok','✓ Realizou');ok.onclick=()=>marcarServico(a.id,'realizado',id);
+        const no=EL('button','qb no','✕ Faltou');no.onclick=()=>marcarServico(a.id,'faltou',id);
+        const ed=EL('button','qb','Editar');ed.onclick=()=>{ov.remove();openAgendamento(a,{})};
+        btns.appendChild(ok);btns.appendChild(no);btns.appendChild(ed);
+      } else {
+        // já resolvido: vira histórico, sem opção de marcar de novo (só desfazer se errou)
+        const undo=EL('button','qb','↩︎ Desfazer');undo.onclick=()=>marcarServico(a.id,'marcado',id);
+        const ed=EL('button','qb','Editar');ed.onclick=()=>{ov.remove();openAgendamento(a,{})};
+        btns.appendChild(undo);btns.appendChild(ed);
+      }
       row.appendChild(btns); sp.appendChild(row);
     });
     m.appendChild(sp);
