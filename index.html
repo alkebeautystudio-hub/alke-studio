@@ -986,7 +986,7 @@ function viewMeta(){
   // seletor de nível: campanha > conjunto > anúncio
   const tog=EL('div','segtog'); tog.style.marginTop='8px';
   [['campaign','Campanhas'],['adset','Conjuntos'],['ad','Anúncios']].forEach(([k,l])=>{
-    const b=EL('button',S.metaLevel===k?'on':'',l);b.onclick=()=>{S.metaLevel=k;render()};tog.appendChild(b);
+    const b=EL('button',S.metaLevel===k?'on':'',l);b.onclick=()=>{S.metaLevel=k;S.metaSel&&S.metaSel.clear();render()};tog.appendChild(b);
   });
   w.appendChild(tog);
   const box=EL('div'); box.style.marginTop='12px';
@@ -1002,32 +1002,58 @@ function viewMeta(){
       box.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:4px',textContent:'Não consegui puxar o Meta agora'+(data&&data.error?': '+data.error:'. O token pode ter expirado — me avisa que eu renovo.')}));
       return;
     }
-    const t=data.total||{gasto:0,alcance:0,conversas:0,leads:0};
     const fat=vendasMes().reduce((s,a)=>s+(valorAt(a)||0),0);
-    const g=EL('div','grid');
-    g.appendChild(tile('Gasto no tráfego',fmt(t.gasto)));
-    g.appendChild(tile('Alcance',nMil(t.alcance)));
-    g.appendChild(tile('Conversas iniciadas',nMil((t.conversas||0)+(t.leads||0))));
-    g.appendChild(tile('Faturamento do studio',fmt(fat),'pos'));
-    box.appendChild(g);
-    const roas=t.gasto>0?(fat/t.gasto):0;
-    const rb=EL('div'); rb.style.cssText='margin:12px 0;padding:13px 15px;border-radius:12px;background:var(--goldsoft);font-size:14px;line-height:1.5';
-    rb.innerHTML='No período o studio gastou <b>'+fmt(t.gasto)+'</b> em anúncios e faturou <b>'+fmt(fat)+'</b>.'+(t.gasto>0?(' Pra cada R$1 no tráfego, voltou <b>'+roas.toFixed(1).replace('.',',')+'x</b> em faturamento.'):'');
-    box.appendChild(rb);
-    const titNiv=S.metaLevel==='ad'?'Por anúncio':S.metaLevel==='adset'?'Por conjunto':'Por campanha';
-    const pan=EL('div','panel'); pan.appendChild(EL('h3',null,titNiv));
-    const camps=data.campanhas||[];
-    if(!camps.length) pan.appendChild(EL('p','muted','Sem dados no período.'));
-    camps.sort((a,b)=>b.gasto-a.gasto).forEach(c=>{
-      const row=EL('div','rowline'); const left=EL('div'); left.style.minWidth='0';
-      left.appendChild(Object.assign(EL('div'),{textContent:c.nome,style:'font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
-      left.appendChild(Object.assign(EL('div','muted'),{textContent:'alcance '+nMil(c.alcance)+' · '+nMil((c.conversas||0)+(c.leads||0))+' conversas · '+nMil(c.cliques)+' cliques',style:'font-size:12px'}));
-      row.appendChild(left);
-      row.appendChild(Object.assign(EL('b','serif'),{textContent:fmt(c.gasto),style:'white-space:nowrap;margin-left:10px'}));
-      pan.appendChild(row);
-    });
-    box.appendChild(pan);
-    box.appendChild(Object.assign(EL('p','hint'),{style:'margin-top:8px',textContent:'Dados ao vivo da conta de anúncio da Alke. O faturamento é o total do studio no período — nem toda venda vem do tráfego, então use como termômetro, não atribuição exata.'}));
+    const items=(data.campanhas||[]).slice().sort((a,b)=>b.gasto-a.gasto);
+    S.metaSel=S.metaSel||new Set();
+    const selKey=c=>c.id||c.nome;
+    const titNiv=S.metaLevel==='ad'?'anúncio':S.metaLevel==='adset'?'conjunto':'campanha';
+    const stInfo=s=>{const u=(s||'').toUpperCase();if(u==='ACTIVE')return{t:'ativa',bg:'var(--win)'};if(u.indexOf('PAUSED')>=0)return{t:'pausada',bg:'var(--muted)'};if(!s)return null;return{t:u.toLowerCase().replace(/_/g,' '),bg:'var(--muted)'};};
+    const periodo='Período: '+brDate(S.dashFrom,{day:'2-digit',month:'2-digit'})+' a '+brDate(S.dashTo,{day:'2-digit',month:'2-digit'});
+    const summary=EL('div'); const pan=EL('div','panel');
+    const paint=()=>{
+      const sel=items.filter(c=>S.metaSel.size?S.metaSel.has(selKey(c)):true);
+      const t=sel.reduce((s,c)=>({gasto:s.gasto+c.gasto,alcance:s.alcance+c.alcance,conv:s.conv+(c.conversas||0)+(c.leads||0)}),{gasto:0,alcance:0,conv:0});
+      summary.innerHTML='';
+      summary.appendChild(Object.assign(EL('div','muted'),{textContent:periodo+(S.metaSel.size?(' · '+S.metaSel.size+' '+titNiv+'(s) selecionada(s)'):' · todas'),style:'font-size:12.5px;margin-bottom:8px'}));
+      const g=EL('div','grid');
+      g.appendChild(tile('Gasto no tráfego',fmt(t.gasto)));
+      g.appendChild(tile('Alcance',nMil(t.alcance)));
+      g.appendChild(tile('Conversas iniciadas',nMil(t.conv)));
+      g.appendChild(tile('Faturamento do studio',fmt(fat),'pos'));
+      summary.appendChild(g);
+      const roas=t.gasto>0?(fat/t.gasto):0;
+      const rb=EL('div'); rb.style.cssText='margin:12px 0 0;padding:13px 15px;border-radius:12px;background:var(--goldsoft);font-size:14px;line-height:1.5';
+      rb.innerHTML='Gasto <b>'+fmt(t.gasto)+'</b> e faturamento do studio <b>'+fmt(fat)+'</b> no período.'+(t.gasto>0?(' Pra cada R$1 no tráfego, <b>'+roas.toFixed(1).replace('.',',')+'x</b> de volta.'):'');
+      summary.appendChild(rb);
+    };
+    const drawList=()=>{
+      pan.innerHTML='';
+      const h=EL('div','listhead'); h.appendChild(EL('h3',null,'Por '+titNiv));
+      if(S.metaSel.size){const cl=EL('button','btn ghost sm','Limpar seleção');cl.onclick=()=>{S.metaSel.clear();drawList();paint()};h.appendChild(cl);}
+      pan.appendChild(h);
+      if(!items.length){pan.appendChild(EL('p','muted','Sem dados no período.'));return;}
+      items.forEach(c=>{
+        const key=selKey(c);const on=S.metaSel.has(key);
+        const row=EL('div','rowline');row.style.cursor='pointer';row.style.gap='10px';
+        if(on){row.style.background='var(--goldsoft)';row.style.borderRadius='8px';row.style.padding='8px 10px';}
+        const cb=document.createElement('input');cb.type='checkbox';cb.checked=on;cb.style.cssText='width:17px;height:17px;flex:0 0 auto;accent-color:var(--gold)';
+        const left=EL('div');left.style.cssText='flex:1 1 auto;min-width:0';
+        const l1=EL('div');l1.style.cssText='font-weight:600;font-size:14px;display:flex;align-items:center;gap:7px';
+        l1.appendChild(Object.assign(EL('span'),{textContent:c.nome,style:'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
+        const si=stInfo(c.status);if(si){const bb=EL('span');bb.textContent=si.t;bb.style.cssText='flex:0 0 auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#fff;background:'+si.bg+';padding:2px 7px;border-radius:999px';l1.appendChild(bb);}
+        left.appendChild(l1);
+        left.appendChild(Object.assign(EL('div','muted'),{textContent:'alcance '+nMil(c.alcance)+' · '+nMil((c.conversas||0)+(c.leads||0))+' conversas · '+nMil(c.cliques)+' cliques',style:'font-size:12px'}));
+        const val=Object.assign(EL('b','serif'),{textContent:fmt(c.gasto),style:'white-space:nowrap'});
+        const toggle=()=>{if(S.metaSel.has(key))S.metaSel.delete(key);else S.metaSel.add(key);drawList();paint()};
+        cb.onclick=ev=>{ev.stopPropagation();toggle()};
+        row.onclick=toggle;
+        row.appendChild(cb);row.appendChild(left);row.appendChild(val);
+        pan.appendChild(row);
+      });
+    };
+    box.appendChild(summary); box.appendChild(pan);
+    box.appendChild(Object.assign(EL('p','hint'),{style:'margin-top:8px',textContent:'Marque as '+titNiv+'s que quer somar lá em cima (nenhuma marcada = todas). O selo mostra ativa ou pausada. Dados ao vivo da conta da Alke.'}));
+    paint(); drawList();
   })();
   return w;
 }
