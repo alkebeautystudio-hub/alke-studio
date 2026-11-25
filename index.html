@@ -785,7 +785,8 @@ function tile(k,v,cls){const t=EL('div','tile');t.appendChild(EL('div','k',k));t
 function caixa(){
   let entradas=0; vendasMes().forEach(a=>{const p=proById(a.profissional_id);if(!p.socia)entradas+=(valorAt(a)||0)*(pctPro(p)/100)});
   const meses=mesesNoRange();
-  const gastos=S.despesas.filter(d=>meses.has(monthKey(d.mes))).reduce((s,d)=>s+(Number(d.valor)||0),0);
+  const ehStudio=d=>{const p=proById(d.profissional_id);return p.socia||p.admin};
+  const gastos=S.despesas.filter(d=>meses.has(monthKey(d.mes))&&ehStudio(d)).reduce((s,d)=>s+(Number(d.valor)||0),0);
   const fixo=(Number(S.config.custo_total_mes)||0)*meses.size;
   return {entradas,fixo,gastos,saldo:entradas-fixo-gastos};
 }
@@ -803,7 +804,7 @@ function despesasPanel(){
   const p=EL('div','panel'); const h=EL('div','listhead');h.appendChild(EL('h3',null,'Gastos do período'));
   const add=EL('button','btn ghost sm','+ Gasto');add.onclick=()=>openDespesa();h.appendChild(add);p.appendChild(h);
   p.appendChild(EL('p','muted','Cada sócia lança o que pagou do bolso. No fim, o sistema mostra quem deve pra quem.'));
-  const _mr=mesesNoRange(); const mine=S.despesas.filter(d=>_mr.has(monthKey(d.mes)));
+  const _mr=mesesNoRange(); const mine=S.despesas.filter(d=>_mr.has(monthKey(d.mes))&&(proById(d.profissional_id).socia||proById(d.profissional_id).admin));
   // por sócia
   const socias=S.pros.filter(p=>p.socia);
   const tot={}; socias.forEach(s=>tot[s.id]=0);
