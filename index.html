@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Alke Beauty Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600;700&family=Cormorant:ital@1&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EFE4CE; --bg2:#E8DBC0; --surface:#FAF4E6; --surface2:#F4EAD4;
+  --ink:#332C23; --muted:#8C7E65; --gold:#A8823A; --gold2:#C19A4C; --goldsoft:#EADFC4;
+  --line:#E2D4B8; --line2:#D8C7A4; --wine:#7A4A52;
+  --win:#5B8C5A; --warn:#C08A2E; --alert:#B5544E;
+  --disp:'Cormorant Garamond',Georgia,serif; --body:'Inter',system-ui,sans-serif;
+  --shadow:0 1px 2px rgba(51,44,35,.05),0 10px 30px rgba(51,44,35,.07);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1E1913; --bg2:#19140F; --surface:#272019; --surface2:#2F271E;
+  --ink:#F1E7D6; --muted:#B0A185; --gold:#C8A25A; --gold2:#D9B874; --goldsoft:#3A2F1E;
+  --line:#3A3122; --line2:#473C29; --win:#7CB07A; --warn:#D9A84E; --alert:#D98B84;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.4); color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#1E1913; --bg2:#19140F; --surface:#272019; --surface2:#2F271E;
+  --ink:#F1E7D6; --muted:#B0A185; --gold:#C8A25A; --gold2:#D9B874; --goldsoft:#3A2F1E;
+  --line:#3A3122; --line2:#473C29; --win:#7CB07A; --warn:#D9A84E; --alert:#D98B84;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.4); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--disp);font-weight:600;margin:0;letter-spacing:.2px}
+button,input,select,textarea{font-family:var(--body);font-size:14px}
+button{cursor:pointer}
+.gold{color:var(--gold)}
+.serif{font-family:var(--disp)}
+.eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);font-weight:600}
+.muted{color:var(--muted)}
+/* ====== LOGIN ====== */
+#login{min-height:100%;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 50% -10%,var(--surface),var(--bg) 60%)}
+.loginbox{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:36px 30px;text-align:center}
+.wordmark{font-family:var(--disp);font-size:34px;letter-spacing:.32em;color:var(--gold);font-weight:600;padding-left:.32em}
+.wordmark small{display:block;font-size:11px;letter-spacing:.42em;color:var(--muted);margin-top:4px;padding-left:.42em;font-family:var(--body);font-weight:500}
+.arc{width:70px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:18px auto 22px}
+#login input{width:100%;padding:13px 14px;border:1px solid var(--line2);border-radius:11px;background:var(--bg);color:var(--ink);margin-bottom:11px}
+#login input:focus{outline:2px solid var(--gold);outline-offset:1px}
+.btn{border:1px solid var(--gold);background:var(--gold);color:#fff;border-radius:11px;padding:12px 18px;font-weight:600;box-shadow:var(--shadow)}
+.btn:active{transform:translateY(1px)}
+.btn.block{width:100%}
+.btn.ghost{background:var(--surface);color:var(--gold)}
+.btn.sm{padding:7px 12px;font-size:13px;border-radius:9px}
+.loginmsg{min-height:18px;font-size:13px;color:var(--alert);margin-top:8px}
+/* ====== APP SHELL ====== */
+#app{display:none;min-height:100%}
+.shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+.side{background:var(--bg2);border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.side .mark{font-family:var(--disp);font-size:22px;letter-spacing:.28em;color:var(--gold);font-weight:600;padding:6px 10px 2px .28em}
+.side .mark small{display:block;font-family:var(--body);font-size:9px;letter-spacing:.38em;color:var(--muted);font-weight:500;padding-left:.1em}
+.navsep{height:1px;background:var(--line);margin:12px 6px}
+.nav{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--ink);border:none;background:none;width:100%;text-align:left;font-weight:500;font-size:14px}
+.nav .ic{width:17px;text-align:center;opacity:.8}
+.nav:hover{background:var(--surface2)}
+.nav.on{background:var(--surface);box-shadow:var(--shadow);color:var(--gold);font-weight:600}
+.side .who{margin-top:auto;padding:12px 10px;border-top:1px solid var(--line);font-size:13px}
+.side .who b{display:block}
+.content{min-width:0;padding:22px clamp(16px,3vw,34px);padding-left:max(16px,env(safe-area-inset-left))}
+.topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.topbar h2{font-size:30px}
+.topbar .sub{color:var(--muted);font-size:13px}
+.spacer{margin-left:auto}
+/* mobile top nav */
+.mtop{display:none}
+/* ====== FUNIL ====== */
+.kstats{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 6px}
+.kstat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 14px;font-size:13px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow)}
+.kstat b{font-family:var(--disp);font-size:18px}
+.kstat .d{width:8px;height:8px;border-radius:50%}
+.board{display:flex;gap:13px;overflow-x:auto;padding:14px 2px 10px}
+.col{flex:0 0 275px;min-width:275px;background:var(--surface2);border:1px solid var(--line);border-radius:15px;display:flex;flex-direction:column}
+.col.drop{outline:2px dashed var(--gold);outline-offset:-4px;background:var(--goldsoft)}
+.card[draggable]{cursor:grab}.card[draggable]:active{cursor:grabbing}
+.colh{display:flex;align-items:center;justify-content:space-between;padding:13px 14px 7px}
+.colh b{font-family:var(--disp);font-size:16px;font-weight:600}
+.pill{font-size:11px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 9px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cards{display:flex;flex-direction:column;gap:9px;padding:3px 10px 13px;min-height:30px}
+.card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:12px;padding:11px 12px;box-shadow:var(--shadow);cursor:pointer;transition:transform .08s,box-shadow .12s}
+.card:hover{transform:translateY(-1px);box-shadow:0 2px 4px rgba(51,44,35,.07),0 14px 32px rgba(51,44,35,.1)}
+.card .nm{font-weight:600;font-size:14.5px}
+.card .mini{font-size:12px;color:var(--muted);margin-top:3px}
+.tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.tag{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;letter-spacing:.02em}
+.tag.org{background:var(--goldsoft);color:var(--gold)}
+.tag.al{background:color-mix(in srgb,var(--alert) 15%,transparent);color:var(--alert)}
+.tag.wn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.tag.money{background:color-mix(in srgb,var(--win) 15%,transparent);color:var(--win);font-variant-numeric:tabular-nums}
+.qa{display:flex;gap:6px;margin-top:9px}
+.qb{flex:1;border:1px solid var(--line2);background:var(--bg);border-radius:8px;padding:6px;font-size:12px;font-weight:600;color:var(--muted)}
+.qb.go{color:var(--gold);border-color:var(--gold)} .qb.ok{color:var(--win)} .qb.no{color:var(--muted)}
+/* ====== CARDS/TILES ====== */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:13px;margin-top:16px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:17px;box-shadow:var(--shadow)}
+.tile .k{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.tile .v{font-family:var(--disp);font-size:30px;font-weight:600;margin-top:5px;font-variant-numeric:tabular-nums}
+.tile .v.pos{color:var(--win)} .tile .v.neg{color:var(--alert)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:18px;box-shadow:var(--shadow);margin-top:16px}
+.panel h3{font-size:18px;margin-bottom:3px}
+.panel.caixa{background:linear-gradient(160deg,var(--goldsoft),var(--surface))}
+.rowline{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.rowline:last-child{border-bottom:none}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
+.listhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.srow{display:grid;grid-template-columns:1.6fr .9fr .6fr .7fr .7fr auto;gap:9px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.srow .nm{font-weight:600}
+.srow input{padding:6px 8px;border:1px solid var(--line2);border-radius:8px;background:var(--bg);color:var(--ink);width:100%}
+.soon{text-align:center;color:var(--muted);padding:50px 18px}
+.soon .big{font-family:var(--disp);font-size:26px;color:var(--ink);margin-bottom:6px}
+/* ====== MODAL ====== */
+.ov{position:fixed;inset:0;background:rgba(40,28,20,.5);display:grid;place-items:center;padding:16px;z-index:50}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);width:100%;max-width:460px;max-height:92vh;overflow:auto;padding:22px}
+.modal h3{font-size:21px;margin-bottom:4px}
+.modal.big{max-width:600px}
+.stagepills{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 14px}
+.sp{font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--bg);color:var(--muted);cursor:pointer}
+.sp.on{background:var(--gold);color:#fff;border-color:var(--gold)}
+.f{display:flex;flex-direction:column;gap:5px;margin:12px 0}
+.f label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.f input,.f select,.f textarea{width:100%;padding:10px 11px;border:1px solid var(--line2);border-radius:10px;background:var(--bg);color:var(--ink)}
+.f input:focus,.f select:focus,.f textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.mactions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+a.lk{color:var(--gold);text-decoration:none;font-size:12.5px}
+.chiprow{display:flex;gap:7px;flex-wrap:wrap}
+. chip{}
+@media(max-width:820px){
+  .shell{grid-template-columns:1fr}
+  .side{display:none}
+  .mtop{display:flex;gap:4px;overflow-x:auto;padding:10px 12px;background:var(--bg2);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  .mtop .nav{width:auto;white-space:nowrap;padding:8px 13px}
+  .topbar h2{font-size:25px}
+  .two{grid-template-columns:1fr}
+  .srow{grid-template-columns:1fr 1fr;gap:6px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="loginbox">
+    <div class="wordmark">ALKE<small>BEAUTY STUDIO</small></div>
+    <div class="arc"></div>
+    <form id="loginform" autocomplete="on">
+      <input id="email" type="email" placeholder="e-mail" autocomplete="username" required>
+      <input id="senha" type="password" placeholder="senha" autocomplete="current-password" required>
+      <button class="btn block" type="submit" id="loginbtn">Entrar</button>
+    </form>
+    <div class="loginmsg" id="loginmsg"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="shell">
+    <aside class="side">
+      <div class="mark">ALKE<small>BEAUTY STUDIO</small></div>
+      <div class="navsep"></div>
+      <nav id="nav"></nav>
+      <div class="who" id="who"></div>
+    </aside>
+    <div style="min-width:0">
+      <div class="mtop" id="mtop"></div>
+      <main class="content" id="view"></main>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SUPA_URL="https://rzgbzwczfdjhbheofwsz.supabase.co";
+const SUPA_KEY="sb_publishable_J24k3rnZfDOh0I0xT61LYg__gQ74_t2";
+const sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+
+const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+const fmt=v=>BRL.format(Number(v)||0);
+const EL=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+const ORIGENS=["Instagram (anúncio)","Instagram (orgânico)","Indicação","WhatsApp","Google","Passou na porta","Outro"];
+const ETAPAS=[{k:'lead',l:'Lead'},{k:'conversa',l:'Em conversa'},{k:'followup',l:'Follow-up'},{k:'agendada',l:'Agendada'},{k:'realizou',l:'Realizou'},{k:'naoveio',l:'Não veio'}];
+const monthKey=d=>{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')};
+
+const S={me:null,pros:[],servicos:[],precos:{},leads:[],fin:{},config:{custo_total_mes:0},despesas:[],tab:'funil',month:monthKey(Date.now())};
+
+// ---------- AUTH ----------
+document.getElementById('loginform').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('loginbtn'), msg=document.getElementById('loginmsg');
+  btn.textContent='Entrando…'; msg.textContent='';
+  const {error}=await sb.auth.signInWithPassword({email:email.value.trim(),password:senha.value});
+  btn.textContent='Entrar';
+  if(error){msg.textContent='E-mail ou senha incorretos.';return;}
+  boot();
+});
+async function boot(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){document.getElementById('login').style.display='grid';document.getElementById('app').style.display='none';return;}
+  // carrega "quem sou eu"
+  const {data:me}=await sb.from('profissionais').select('*').eq('user_id',session.user.id).maybeSingle();
+  S.me=me||{nome:session.user.email,admin:false,socia:false};
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='block';
+  await loadAll(); renderShell(); render();
+}
+async function loadAll(){
+  const [pros,serv,prec,leads,fin,cfg,desp]=await Promise.all([
+    sb.from('profissionais').select('*').order('ordem'),
+    sb.from('servicos').select('*').order('nome'),
+    sb.from('servicos_preco').select('*'),
+    sb.from('leads').select('*').order('criado_em',{ascending:false}),
+    sb.from('financeiro').select('*'),
+    sb.from('studio_config').select('*').eq('id',1).maybeSingle(),
+    sb.from('despesas').select('*'),
+  ]);
+  S.pros=pros.data||[]; S.servicos=serv.data||[];
+  S.precos={}; (prec.data||[]).forEach(p=>S.precos[p.servico_id]=p);
+  S.leads=leads.data||[];
+  S.fin={}; (fin.data||[]).forEach(f=>S.fin[f.lead_id]=f);
+  S.config=cfg.data||{custo_total_mes:0};
+  S.despesas=desp.data||[];
+}
+const proById=id=>S.pros.find(p=>p.id===id)||{};
+const servById=id=>S.servicos.find(s=>s.id===id)||{};
+const isAdmin=()=>!!S.me.admin;
+const canMoney=proId=>isAdmin()||S.me.id===proId;
+const precoDe=l=>{const p=S.precos[l.servico_id];return p?Number(p.preco):null};
+const custoDe=l=>{const p=S.precos[l.servico_id];return p?Number(p.custo):0};
+const valorFinal=l=>{const pr=precoDe(l);return pr==null?null:pr-(Number(l.desconto)||0)};
+
+// ---------- SHELL ----------
+function renderShell(){
+  const tabs=[['funil','Funil','◇'],['agenda','Agenda','▦'],['servicos','Serviços','✦'],['painel','Painel','◉']];
+  if(isAdmin()) tabs.push(['equipe','Equipe','♛']);
+  const nav=document.getElementById('nav'); nav.innerHTML='';
+  const mtop=document.getElementById('mtop'); mtop.innerHTML='';
+  tabs.forEach(([k,l,ic])=>{
+    for(const host of [nav,mtop]){
+      const b=EL('button','nav'+(S.tab===k?' on':''));
+      b.innerHTML='<span class="ic">'+ic+'</span>'; b.appendChild(document.createTextNode(l));
+      b.onclick=()=>{S.tab=k;renderShell();render()};
+      host.appendChild(b);
+    }
+  });
+  const who=document.getElementById('who');
+  who.innerHTML=''; const b=EL('b',null,S.me.nome||'—');
+  const r=EL('div','muted',isAdmin()?'Administrador':(S.me.socia?'Sócia':'Profissional'));
+  who.appendChild(b); who.appendChild(r);
+  const out=EL('button','btn ghost sm','Sair'); out.style.marginTop='9px';
+  out.onclick=async()=>{await sb.auth.signOut();location.reload()};
+  who.appendChild(out);
+}
+function render(){
+  const v=document.getElementById('view'); v.innerHTML='';
+  if(S.tab==='funil') v.appendChild(viewFunil());
+  else if(S.tab==='servicos') v.appendChild(viewServicos());
+  else if(S.tab==='painel') v.appendChild(viewPainel());
+  else if(S.tab==='agenda') v.appendChild(soon('Agenda','O calendário com horários, duração e cores por profissional — agendando uma pra outra — entra na próxima etapa.'));
+  else if(S.tab==='equipe') v.appendChild(viewEquipe());
+}
+function pageHead(title,sub){
+  const t=EL('div','topbar'); const h=EL('div');
+  h.appendChild(EL('div','eyebrow','Alke Studio')); h.appendChild(EL('h2',null,title));
+  t.appendChild(h); if(sub){const s=EL('div','sub');s.style.alignSelf='flex-end';s.textContent=sub;t.appendChild(s);} return t;
+}
+function soon(t,d){const w=EL('div');w.appendChild(pageHead(t));const s=EL('div','soon');s.appendChild(EL('div','big','Em breve'));s.appendChild(EL('div',null,d));w.appendChild(s);return w}
+
+// ---------- FUNIL ----------
+function leadAlert(l){
+  if(l.proxima_acao_em && new Date(l.proxima_acao_em)<new Date()) return {cls:'al',txt:'atrasado'};
+  if((l.etapa==='conversa'||l.etapa==='followup') && !l.proxima_acao_em) return {cls:'wn',txt:'responder'};
+  return null;
+}
+function viewFunil(){
+  const w=EL('div');
+  const t=pageHead('Funil'); const add=EL('button','btn','+ Novo lead'); add.style.marginLeft='auto';
+  add.onclick=()=>openLead(null); t.appendChild(add); w.appendChild(t);
+  // stats
+  const ks=EL('div','kstats');
+  const atr=S.leads.filter(l=>leadAlert(l)).length;
+  ks.appendChild(statPill('No funil',S.leads.filter(l=>!['realizou','naoveio'].includes(l.etapa)).length));
+  ks.appendChild(statPill('Precisam de ação',atr,'var(--alert)'));
+  ks.appendChild(statPill('Agendadas',S.leads.filter(l=>l.etapa==='agendada').length,'var(--gold)'));
+  w.appendChild(ks);
+  const board=EL('div','board');
+  ETAPAS.forEach(e=>{
+    const col=EL('div','col');
+    col.ondragover=ev=>{ev.preventDefault();col.classList.add('drop')};
+    col.ondragleave=()=>col.classList.remove('drop');
+    col.ondrop=ev=>{ev.preventDefault();col.classList.remove('drop');const id=ev.dataTransfer.getData('text/plain');const ld=S.leads.find(x=>x.id===id);if(ld&&ld.etapa!==e.k)move(ld,e.k)};
+    const items=S.leads.filter(l=>(l.etapa||'lead')===e.k);
+    const h=EL('div','colh'); h.appendChild(EL('b',null,e.l)); h.appendChild(EL('span','pill',String(items.length))); col.appendChild(h);
+    const cc=EL('div','cards');
+    items.forEach(l=>cc.appendChild(cardLead(l)));
+    col.appendChild(cc); board.appendChild(col);
+  });
+  w.appendChild(board); return w;
+}
+function statPill(label,n,color){const p=EL('div','kstat');const d=EL('span','d');d.style.background=color||'var(--muted)';p.appendChild(d);p.appendChild(EL('b',null,String(n)));p.appendChild(EL('span','muted',label));return p}
+function cardLead(l){
+  const pro=proById(l.profissional_id), sv=servById(l.servico_id);
+  const c=EL('div','card'); if(pro.cor)c.style.borderLeftColor=pro.cor;
+  c.onclick=()=>openLead(l.id);
+  c.draggable=true;
+  c.ondragstart=ev=>{ev.dataTransfer.setData('text/plain',l.id);ev.dataTransfer.effectAllowed='move';c.style.opacity=.5};
+  c.ondragend=()=>{c.style.opacity=1};
+  c.appendChild(EL('div','nm',l.nome||'Sem nome'));
+  if(sv.nome||pro.nome) c.appendChild(EL('div','mini',[sv.nome,pro.nome].filter(Boolean).join(' · ')));
+  if(l.proxima_acao) c.appendChild(EL('div','mini','→ '+l.proxima_acao));
+  const tags=EL('div','tags');
+  if(l.origem) tags.appendChild(EL('span','tag org',l.origem));
+  const al=leadAlert(l); if(al) tags.appendChild(EL('span','tag '+al.cls,al.txt));
+  if(l.retorno){const dd=Math.ceil((new Date(l.retorno)-new Date())/864e5);if(dd<=7)tags.appendChild(EL('span','tag wn',dd<=0?'retorno hoje':'retorno '+dd+'d'));}
+  if(Number(l.desconto)>0 && canMoney(l.profissional_id)) tags.appendChild(EL('span','tag wn','desc '+fmt(l.desconto)));
+  const vf=valorFinal(l);
+  if(l.etapa==='realizou' && vf!=null) tags.appendChild(EL('span','tag money',fmt(vf)));
+  if(tags.children.length) c.appendChild(tags);
+  // quick actions
+  const e=l.etapa||'lead';
+  if(['lead','conversa','followup'].includes(e)){
+    const qa=EL('div','qa');
+    const ag=EL('button','qb go','📅 Agendar');ag.onclick=ev=>{ev.stopPropagation();move(l,'agendada')};qa.appendChild(ag);
+    if(e!=='followup'){const fu=EL('button','qb','Follow-up');fu.onclick=ev=>{ev.stopPropagation();move(l,'followup')};qa.appendChild(fu);}
+    c.appendChild(qa);
+  } else if(e==='agendada'){
+    const qa=EL('div','qa');
+    const ok=EL('button','qb ok','✓ Realizou');ok.onclick=ev=>{ev.stopPropagation();move(l,'realizou')};
+    const no=EL('button','qb no','✕ Faltou');no.onclick=ev=>{ev.stopPropagation();move(l,'naoveio')};
+    qa.appendChild(ok);qa.appendChild(no);c.appendChild(qa);
+  }
+  return c;
+}
+async function move(l,etapa){
+  const upd={etapa,atualizado_em:new Date().toISOString()};
+  if(etapa==='realizou'&&!l.realizado_em) upd.realizado_em=new Date().toISOString();
+  await sb.from('leads').update(upd).eq('id',l.id);
+  await loadAll(); render();
+}
+
+// ---------- LEAD MODAL ----------
+function openLead(id,prefill){
+  const l = id ? {...S.leads.find(x=>x.id===id)} : Object.assign({etapa:'lead',origem:'',servico_id:'',nome:'',telefone:'',nascimento:'',desconto:0,retorno:'',obs:'',proxima_acao:''}, prefill||{});
+  let etapaVal=l.etapa||'lead';
+  const m=EL('div','modal big'); m.appendChild(EL('h3',null,id?(l.nome||'Ficha da cliente'):'Nova cliente'));
+  const pills=EL('div','stagepills');
+  const paintPills=()=>{[...pills.children].forEach(b=>b.classList.toggle('on',b.dataset.k===etapaVal))};
+  ETAPAS.forEach(e=>{const b=EL('button','sp',e.l);b.dataset.k=e.k;b.onclick=()=>{etapaVal=e.k;paintPills()};pills.appendChild(b)});
+  paintPills(); m.appendChild(pills);
+  const nome=inp('text',l.nome,'Nome da cliente');
+  const tel=inp('text',l.telefone,'DDD + número');
+  const nasc=inp('date',l.nascimento||'');
+  const org=sel(ORIGENS.map(o=>[o,o]),l.origem,'— origem —');
+  const serv=sel(S.servicos.map(s=>[s.id,s.nome+' · '+(proById(s.profissional_id).nome||'')]),l.servico_id,'— serviço —');
+  const prox=inp('text',l.proxima_acao,'Ex: responder no WhatsApp');
+  const desc=inp('number',l.desconto||0);
+  const ret=inp('date',l.retorno||'');
+  const obs=document.createElement('textarea');obs.rows=2;obs.value=l.obs||'';obs.placeholder='Preferências, alergias, histórico…';
+  const priceInfo=EL('div','muted'); priceInfo.style.cssText='font-size:13px;margin:-2px 0 6px';
+  const refreshPrice=()=>{
+    const p=S.precos[serv.value];
+    if(!p){priceInfo.textContent='';return;}
+    const d=Number(desc.value)||0, final=Number(p.preco)-d;
+    priceInfo.innerHTML='Preço do serviço: <b>'+fmt(p.preco)+'</b>'+(d>0?' − desconto = <b class="gold">'+fmt(final)+'</b>':'');
+  };
+  serv.onchange=refreshPrice; desc.oninput=refreshPrice;
+  m.appendChild(field('Nome',nome)); m.appendChild(field('WhatsApp',tel)); m.appendChild(field('Data de nascimento',nasc));
+  m.appendChild(field('Origem',org)); m.appendChild(field('Serviço',serv));
+  m.appendChild(field('Próxima ação',prox));
+  m.appendChild(field('Desconto (R$), se teve',desc)); m.appendChild(priceInfo); refreshPrice();
+  m.appendChild(field('Data de retorno',ret));
+  m.appendChild(field('Observações',obs));
+  if(id && l.telefone){
+    const key=l.telefone.replace(/\D/g,'');
+    const hist=S.leads.filter(x=>x.id!==id && x.etapa==='realizou' && x.telefone && x.telefone.replace(/\D/g,'')===key).sort((a,b)=>new Date(b.realizado_em||0)-new Date(a.realizado_em||0));
+    const hp=EL('div','panel'); hp.style.marginTop='6px';
+    const hh=EL('div','listhead');hh.appendChild(EL('div','eyebrow','Serviços realizados'));
+    const nova=EL('button','btn ghost sm','+ Novo atendimento');nova.onclick=()=>{ov.remove();openLead(null,{nome:l.nome,telefone:l.telefone,nascimento:l.nascimento,origem:l.origem,etapa:'agendada'})};
+    hh.appendChild(nova);hp.appendChild(hh);
+    if(!hist.length) hp.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:6px',textContent:'Primeiro atendimento dela.'}));
+    else hist.forEach(h=>{const row=EL('div','rowline');const sv=servById(h.servico_id);
+      row.appendChild(EL('span',null,(h.realizado_em?new Date(h.realizado_em).toLocaleDateString('pt-BR'):'—')+' · '+(sv.nome||'serviço')));
+      const vf=valorFinal(h);if(vf!=null)row.appendChild(EL('span','muted',fmt(vf)));hp.appendChild(row);});
+    m.appendChild(hp);
+  }
+  const act=EL('div','mactions');
+  if(id&&isAdmin()){const del=EL('button','btn ghost sm','Excluir');del.onclick=async()=>{await sb.from('leads').delete().eq('id',id);ov.remove();await loadAll();render()};del.style.marginRight='auto';act.appendChild(del);}
+  const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
+  const save=EL('button','btn','Salvar');
+  save.onclick=async()=>{
+    const proId=servById(serv.value).profissional_id||l.profissional_id||S.me.id;
+    const data={nome:nome.value.trim(),telefone:tel.value.trim(),nascimento:nasc.value||null,origem:org.value,servico_id:serv.value||null,
+      profissional_id:proId,etapa:etapaVal,proxima_acao:prox.value.trim()||null,desconto:Number(desc.value)||0,retorno:ret.value||null,obs:obs.value.trim(),
+      atualizado_em:new Date().toISOString()};
+    if(etapaVal==='realizou') data.realizado_em = l.realizado_em || new Date().toISOString();
+    if(id){ await sb.from('leads').update(data).eq('id',id); }
+    else { await sb.from('leads').insert(data); }
+    ov.remove(); await loadAll(); render();
+  };
+  act.appendChild(cancel); act.appendChild(save); m.appendChild(act);
+  const ov=overlay(m); nome.focus();
+}
+
+// ---------- SERVIÇOS ----------
+function viewServicos(){
+  const w=EL('div'); const t=pageHead('Serviços');
+  const add=EL('button','btn','+ Serviço');add.style.marginLeft='auto';add.onclick=()=>openServ(null);t.appendChild(add);
+  w.appendChild(t);
+  w.appendChild(EL('p','muted','Cada profissional cadastra os seus. Nome e tempo todas veem; custo e preço só você e a dona.'));
+  // agrupa por profissional
+  S.pros.filter(p=>p.presta_servico!==false).forEach(pro=>{
+    const list=S.servicos.filter(s=>s.profissional_id===pro.id);
+    if(!list.length && !(isAdmin()||S.me.id===pro.id)) return;
+    const pan=EL('div','panel');
+    const head=EL('div','listhead'); const hn=EL('div');
+    const dot=EL('span','dot');dot.style.background=pro.cor;dot.style.marginRight='8px';
+    const h3=EL('h3');h3.appendChild(dot);h3.appendChild(document.createTextNode(pro.nome));hn.appendChild(h3);
+    head.appendChild(hn); pan.appendChild(head);
+    if(!list.length) pan.appendChild(EL('div','muted','Nenhum serviço ainda.'));
+    list.forEach(s=>{
+      const price=S.precos[s.id]||{};
+      const canSee=isAdmin()||S.me.id===pro.id;
+      const row=EL('div','srow');
+      row.appendChild(EL('span','nm',s.nome));
+      row.appendChild(EL('span','muted',(s.tempo_min||0)+' min'));
+      row.appendChild(EL('span','muted',canSee?'custo':''));
+      row.appendChild(EL('span',null,canSee?fmt(price.custo):'•••'));
+      row.appendChild(EL('span',null,canSee?fmt(price.preco):'•••'));
+      if(canSee){const ed=EL('button','btn ghost sm','✎');ed.onclick=()=>openServ(s.id);row.appendChild(ed);}
+      else row.appendChild(EL('span'));
+      pan.appendChild(row);
+    });
+    w.appendChild(pan);
+  });
+  return w;
+}
+function openServ(id){
+  const s = id ? {...S.servicos.find(x=>x.id===id)} : {nome:'',profissional_id:S.me.id,tempo_min:30};
+  const price = id ? (S.precos[id]||{custo:0,preco:0}) : {custo:0,preco:0};
+  const m=EL('div','modal'); m.appendChild(EL('h3',null,id?'Serviço':'Novo serviço'));
+  const nome=inp('text',s.nome);
+  const proOpts=S.pros.filter(p=>p.presta_servico!==false).map(p=>[p.id,p.nome]);
+  const pro=sel(proOpts, s.profissional_id); if(!isAdmin())pro.disabled=true;
+  const tempo=inp('number',s.tempo_min); const custo=inp('number',price.custo); const preco=inp('number',price.preco);
+  m.appendChild(field('Nome do serviço',nome)); m.appendChild(field('Profissional',pro));
+  const two=EL('div','two'); two.appendChild(field('Tempo (min)',tempo)); two.appendChild(field('Custo',custo)); m.appendChild(two);
+  m.appendChild(field('Preço',preco));
+  const act=EL('div','mactions');
+  if(id){const del=EL('button','btn ghost sm','Excluir');del.style.marginRight='auto';del.onclick=async()=>{await sb.from('servicos').delete().eq('id',id);ov.remove();await loadAll();render()};act.appendChild(del);}
+  const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
+  const save=EL('button','btn','Salvar');
+  save.onclick=async()=>{
+    const d={nome:nome.value.trim(),profissional_id:pro.value,tempo_min:Number(tempo.value)||0};
+    let sid=id;
+    if(id) await sb.from('servicos').update(d).eq('id',id);
+    else{const {data:ins}=await sb.from('servicos').insert(d).select().single();sid=ins?.id;}
+    if(sid) await sb.from('servicos_preco').upsert({servico_id:sid,custo:Number(custo.value)||0,preco:Number(preco.value)||0});
+    ov.remove(); await loadAll(); render();
+  };
+  act.appendChild(cancel); act.appendChild(save); m.appendChild(act);
+  const ov=overlay(m); nome.focus();
+}
+
+// ---------- PAINEL ----------
+function vendasMes(proId){
+  return S.leads.filter(l=>l.etapa==='realizou' && valorFinal(l)!=null && monthKey(l.realizado_em||l.criado_em)===S.month && (!proId||l.profissional_id===proId));
+}
+function resumo(proId){
+  const v=vendasMes(proId); const fat=v.reduce((s,l)=>s+(valorFinal(l)||0),0);
+  const custo=v.reduce((s,l)=>s+(custoDe(l)||0),0);
+  return {fat,custo,n:v.length,ticket:v.length?fat/v.length:0};
+}
+function viewPainel(){
+  const w=EL('div'); w.appendChild(pageHead('Painel', S.me.nome));
+  w.appendChild(monthNav());
+  if(isAdmin()){
+    // visão geral
+    let fatT=0; vendasMes().forEach(l=>fatT+=valorFinal(l)||0);
+    const cx=caixa();
+    const g=EL('div','grid');
+    g.appendChild(tile('Faturamento do studio',fmt(fatT)));
+    g.appendChild(tile('Atendimentos',String(vendasMes().length)));
+    g.appendChild(tile('Caixa do studio',fmt(cx.saldo),cx.saldo>=0?'pos':'neg'));
+    w.appendChild(g);
+    const pan=EL('div','panel'); pan.appendChild(EL('h3',null,'Por profissional'));
+    S.pros.filter(p=>p.presta_servico!==false).forEach(p=>{
+      const r=resumo(p.id); const row=EL('div','rowline');
+      const left=EL('div');const dot=EL('span','dot');dot.style.background=p.cor;dot.style.marginRight='8px';
+      const nm=EL('span');nm.appendChild(dot);nm.appendChild(document.createTextNode(p.nome));left.appendChild(nm);
+      row.appendChild(left);
+      const rr=EL('div','muted');rr.innerHTML='fat. <b style="color:var(--ink)">'+fmt(r.fat)+'</b> &nbsp;·&nbsp; '+r.n+' atend.';
+      row.appendChild(rr); pan.appendChild(row);
+    });
+    w.appendChild(pan);
+    w.appendChild(caixaPanel()); w.appendChild(despesasPanel());
+    w.appendChild(aniversariantesPanel());
+    return w;
+  }
+  // profissional: só o dela
+  const r=resumo(S.me.id);
+  const g=EL('div','grid');
+  g.appendChild(tile('Faturamento',fmt(r.fat)));
+  g.appendChild(tile('Atendimentos',String(r.n)));
+  g.appendChild(tile('Ticket médio',fmt(r.ticket)));
+  if(S.me.socia){ g.appendChild(tile('Lucro',fmt(r.fat-r.custo+caixa().saldo/2),'pos')); }
+  else { g.appendChild(tile('A repassar (30%)',fmt(r.fat*0.30),'neg')); }
+  w.appendChild(g);
+  if(S.me.socia){ w.appendChild(caixaPanel()); w.appendChild(despesasPanel()); }
+  else {
+    const p=EL('div','panel');p.appendChild(EL('h3',null,'Repasse ao studio'));
+    p.appendChild(EL('p','muted','Você fica com 70% (menos custo) e repassa 30% ao studio.'));
+    p.appendChild(Object.assign(EL('div'),{innerHTML:'<span class="muted">seu líquido estimado:</span> <b class="serif" style="font-size:22px">'+fmt(r.fat*0.70-r.custo)+'</b>'}));
+    w.appendChild(p);
+  }
+  w.appendChild(aniversariantesPanel());
+  return w;
+}
+function monthNav(){
+  const n=EL('div');n.style.cssText='display:flex;align-items:center;gap:12px;margin-top:14px';
+  const prev=EL('button','btn ghost sm','‹');prev.onclick=()=>{const[y,m]=S.month.split('-').map(Number);S.month=monthKey(new Date(y,m-2,1));render()};
+  const next=EL('button','btn ghost sm','›');next.onclick=()=>{const[y,m]=S.month.split('-').map(Number);S.month=monthKey(new Date(y,m,1));render()};
+  const lab=EL('b','serif',new Date(S.month+'-01').toLocaleDateString('pt-BR',{month:'long',year:'numeric'}));
+  lab.style.cssText='font-size:18px;text-transform:capitalize;min-width:160px;text-align:center';
+  n.appendChild(prev);n.appendChild(lab);n.appendChild(next);return n;
+}
+function tile(k,v,cls){const t=EL('div','tile');t.appendChild(EL('div','k',k));t.appendChild(Object.assign(EL('div','v'+(cls?' '+cls:'')),{textContent:v}));return t}
+function caixa(){
+  let entradas=0; vendasMes().forEach(l=>{const p=proById(l.profissional_id);if(!p.socia)entradas+=(valorFinal(l)||0)*0.30});
+  const gastos=S.despesas.filter(d=>monthKey(d.mes)===S.month).reduce((s,d)=>s+(Number(d.valor)||0),0);
+  const fixo=Number(S.config.custo_total_mes)||0;
+  return {entradas,fixo,gastos,saldo:entradas-fixo-gastos};
+}
+function caixaPanel(){
+  const cx=caixa(); const p=EL('div','panel caixa'); p.appendChild(EL('h3',null,'Caixa do Studio'));
+  p.appendChild(EL('p','muted','Entra 30% das não-sócias, sai o custo fixo + gastos. O saldo divide 50/50 entre as sócias.'));
+  const g=EL('div','grid');
+  g.appendChild(tile('Entradas (30%)',fmt(cx.entradas)));
+  g.appendChild(tile('Custo + gastos',fmt(cx.fixo+cx.gastos)));
+  g.appendChild(tile('Saldo',fmt(cx.saldo),cx.saldo>=0?'pos':'neg'));
+  g.appendChild(tile('Pra cada sócia',fmt(cx.saldo/2),cx.saldo>=0?'pos':'neg'));
+  p.appendChild(g); return p;
+}
+function despesasPanel(){
+  const p=EL('div','panel'); const h=EL('div','listhead');h.appendChild(EL('h3',null,'Gastos do mês'));
+  const add=EL('button','btn ghost sm','+ Gasto');add.onclick=()=>openDespesa();h.appendChild(add);p.appendChild(h);
+  p.appendChild(EL('p','muted','Cada sócia lança o que pagou do bolso. No fim, o sistema mostra quem deve pra quem.'));
+  const mine=S.despesas.filter(d=>monthKey(d.mes)===S.month);
+  // por sócia
+  const socias=S.pros.filter(p=>p.socia);
+  const tot={}; socias.forEach(s=>tot[s.id]=0);
+  mine.forEach(d=>{if(tot[d.profissional_id]!=null)tot[d.profissional_id]+=Number(d.valor)||0});
+  socias.forEach(s=>{
+    const row=EL('div','rowline');const dot=EL('span','dot');dot.style.background=s.cor;dot.style.marginRight='8px';
+    const nm=EL('span');nm.appendChild(dot);nm.appendChild(document.createTextNode(s.nome+' pagou'));
+    row.appendChild(nm);row.appendChild(Object.assign(EL('b','serif'),{textContent:fmt(tot[s.id])}));p.appendChild(row);
+  });
+  // acerto
+  if(socias.length===2){
+    const diff=(tot[socias[0].id]-tot[socias[1].id])/2;
+    const msg=EL('div');msg.style.cssText='margin-top:12px;padding:12px;border-radius:11px;background:var(--goldsoft);font-size:13.5px';
+    if(Math.abs(diff)<0.01) msg.textContent='Tá quite — as duas gastaram igual.';
+    else{const dev=diff>0?socias[1]:socias[0], rec=diff>0?socias[0]:socias[1];
+      msg.innerHTML='<b>'+dev.nome+'</b> deve <b class="gold">'+fmt(Math.abs(diff))+'</b> pra <b>'+rec.nome+'</b> pra ficar justo.';}
+    p.appendChild(msg);
+  }
+  // lançamentos
+  if(mine.length){const sep=EL('div','muted');sep.style.cssText='margin-top:12px;font-size:12px';sep.textContent='Lançamentos';p.appendChild(sep);
+    mine.forEach(d=>{const row=EL('div','rowline');row.appendChild(EL('span',null,(d.descricao||'—')+' · '+proById(d.profissional_id).nome));
+      const rt=EL('div','muted');rt.textContent=fmt(d.valor);
+      if(isAdmin()||d.profissional_id===S.me.id){const x=EL('button','btn ghost sm','×');x.style.marginLeft='10px';x.onclick=async()=>{await sb.from('despesas').delete().eq('id',d.id);await loadAll();render()};rt.appendChild(x)}
+      row.appendChild(rt);p.appendChild(row)});}
+  // custo fixo (admin edita)
+  if(isAdmin()){
+    const fx=EL('div');fx.style.cssText='margin-top:14px;display:flex;align-items:center;gap:10px';
+    fx.appendChild(EL('span','muted','Custo fixo do studio (mês):'));
+    const ci=inp('number',S.config.custo_total_mes);ci.style.maxWidth='140px';
+    ci.onchange=async()=>{await sb.from('studio_config').update({custo_total_mes:Number(ci.value)||0}).eq('id',1);await loadAll();render()};
+    fx.appendChild(ci);p.appendChild(fx);
+  }
+  return p;
+}
+function openDespesa(){
+  const m=EL('div','modal');m.appendChild(EL('h3',null,'Lançar gasto'));
+  const desc=inp('text','','Ex: material, aluguel, luz');const val=inp('number',0);
+  m.appendChild(field('Descrição',desc));m.appendChild(field('Valor',val));
+  const act=EL('div','mactions');const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
+  const save=EL('button','btn','Salvar');
+  save.onclick=async()=>{await sb.from('despesas').insert({profissional_id:S.me.id,descricao:desc.value.trim(),valor:Number(val.value)||0,mes:S.month+'-01'});ov.remove();await loadAll();render()};
+  act.appendChild(cancel);act.appendChild(save);m.appendChild(act);const ov=overlay(m);desc.focus();
+}
+
+function aniversariantesPanel(){
+  const mesNum=Number(S.month.split('-')[1]);
+  const bdays=S.leads.filter(l=>l.nascimento && (new Date(l.nascimento).getUTCMonth()+1)===mesNum);
+  const p=EL('div','panel'); p.appendChild(EL('h3',null,'🎂 Aniversariantes do mês'));
+  if(!bdays.length){p.appendChild(EL('p','muted','Ninguém faz aniversário neste mês (ou faltam datas de nascimento nas fichas).'));return p;}
+  bdays.sort((a,b)=>new Date(a.nascimento).getUTCDate()-new Date(b.nascimento).getUTCDate());
+  bdays.forEach(l=>{const row=EL('div','rowline');
+    const d=new Date(l.nascimento).getUTCDate();
+    row.appendChild(EL('span',null,'dia '+String(d).padStart(2,'0')+' · '+(l.nome||'—')));
+    if(l.telefone){const a=EL('a','lk','Parabenizar');a.href='https://wa.me/55'+l.telefone.replace(/\D/g,'').replace(/^55/,'');a.target='_blank';a.rel='noopener';row.appendChild(a);}
+    p.appendChild(row);});
+  return p;
+}
+// ---------- EQUIPE (admin) ----------
+function viewEquipe(){
+  const w=EL('div'); w.appendChild(pageHead('Equipe'));
+  w.appendChild(EL('p','muted','Cadastre profissionais, defina cor, se é sócia e os serviços dela. Login é criado à parte (me peça pra gerar).'));
+  const pan=EL('div','panel');
+  S.pros.forEach(p=>{
+    const row=EL('div','srow');row.style.gridTemplateColumns='1.4fr .8fr .9fr auto';
+    const nm=document.createElement('input');nm.value=p.nome;nm.onchange=()=>sb.from('profissionais').update({nome:nm.value}).eq('id',p.id);
+    const cor=document.createElement('input');cor.type='color';cor.value=p.cor||'#A8823A';cor.onchange=()=>sb.from('profissionais').update({cor:cor.value}).eq('id',p.id);
+    const papel=sel([['socia','Sócia'],['prof','Profissional'],['admin','Admin']], p.admin?'admin':(p.socia?'socia':'prof'));
+    papel.onchange=()=>sb.from('profissionais').update({admin:papel.value==='admin',socia:papel.value==='socia'}).eq('id',p.id).then(()=>loadAll());
+    row.appendChild(nm);row.appendChild(cor);row.appendChild(papel);row.appendChild(EL('span'));
+    pan.appendChild(row);
+  });
+  const add=EL('button','btn ghost sm','+ Profissional');add.style.marginTop='12px';
+  add.onclick=async()=>{await sb.from('profissionais').insert({nome:'Nova profissional',ordem:S.pros.length});await loadAll();render()};
+  pan.appendChild(add); w.appendChild(pan);
+  return w;
+}
+
+// ---------- helpers UI ----------
+function inp(type,val,ph){const i=document.createElement('input');i.type=type;if(val!=null)i.value=val;if(ph)i.placeholder=ph;return i}
+function sel(opts,val,ph){const s=document.createElement('select');if(ph)s.appendChild(new Option(ph,''));opts.forEach(([v,l])=>s.appendChild(new Option(l,v)));if(val!=null)s.value=val;return s}
+function field(label,node){const f=EL('div','f');f.appendChild(EL('label',null,label));f.appendChild(node);return f}
+function overlay(node){const ov=EL('div','ov');ov.onclick=e=>{if(e.target===ov)ov.remove()};ov.appendChild(node);document.body.appendChild(ov);return ov}
+
+boot();
+</script>
+</body>
+</html>
