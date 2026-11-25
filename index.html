@@ -90,6 +90,11 @@ button{cursor:pointer}
 .card:hover{transform:translateY(-1px);box-shadow:0 2px 4px rgba(51,44,35,.07),0 14px 32px rgba(51,44,35,.1)}
 .card .nm{font-weight:600;font-size:14.5px}
 .card .mini{font-size:12px;color:var(--muted);margin-top:3px}
+.card .svline{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink);margin-top:4px}
+.card .svline .svic{width:13px;flex:0 0 auto;font-weight:700;text-align:center}
+.card .svline .svtx{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .svline .svval{margin-left:auto;color:var(--win);font-weight:600;font-variant-numeric:tabular-nums;flex:0 0 auto}
+.svrow{padding:11px 0;border-bottom:1px solid var(--line)}.svrow:last-child{border-bottom:0}
 .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
 .tag{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;letter-spacing:.02em}
 .tag.org{background:var(--goldsoft);color:var(--gold)}
@@ -263,6 +268,11 @@ const canMoney=proId=>isAdmin()||S.me.id===proId;
 const precoDe=l=>{const p=S.precos[l.servico_id];return p?Number(p.preco):null};
 const custoDe=l=>{const p=S.precos[l.servico_id];return p?Number(p.custo):0};
 const valorFinal=l=>{const pr=precoDe(l);return pr==null?null:pr-(Number(l.desconto)||0)};
+// modelo: card = CLIENTE; serviços = agendamentos ligados por lead_id
+const servicosDoLead=id=>S.agendamentos.filter(a=>a.lead_id===id && a.status!=='cancelado').sort((a,b)=>new Date(a.inicio||0)-new Date(b.inicio||0));
+const valorAt=a=>{const p=S.precos[a.servico_id];return p?Number(p.preco)-(Number(a.desconto)||0):null};
+const custoAt=a=>{const p=S.precos[a.servico_id];return p?Number(p.custo):0};
+const statusLabel=s=>s==='realizado'?'realizado':s==='faltou'?'faltou':s==='cancelado'?'cancelado':'agendado';
 
 // ---------- SHELL ----------
 function openDrawer(){document.querySelector('.side')?.classList.add('open');document.getElementById('drawov')?.classList.add('on')}
@@ -341,35 +351,45 @@ function viewFunil(){
 }
 function statPill(label,n,color){const p=EL('div','kstat');const d=EL('span','d');d.style.background=color||'var(--muted)';p.appendChild(d);p.appendChild(EL('b',null,String(n)));p.appendChild(EL('span','muted',label));return p}
 function cardLead(l){
-  const pro=proById(l.profissional_id), sv=servById(l.servico_id);
-  const c=EL('div','card'); if(pro.cor)c.style.borderLeftColor=pro.cor;
+  const servs=servicosDoLead(l.id);
+  const firstPro=proById((servs[0]||{}).profissional_id);
+  const c=EL('div','card'); c.style.borderLeftColor=firstPro.cor||'var(--gold)';
   c.onclick=()=>openLead(l.id);
   c.draggable=true;
   c.ondragstart=ev=>{ev.dataTransfer.setData('text/plain',l.id);ev.dataTransfer.effectAllowed='move';c.style.opacity=.5};
   c.ondragend=()=>{c.style.opacity=1};
   c.appendChild(EL('div','nm',l.nome||'Sem nome'));
-  if(sv.nome||pro.nome) c.appendChild(EL('div','mini',[sv.nome,pro.nome].filter(Boolean).join(' · ')));
+  // serviços da cliente (cada profissional marca o dela DENTRO do card)
+  if(servs.length){
+    servs.forEach(a=>{
+      const sv=servById(a.servico_id),pro=proById(a.profissional_id);
+      const line=EL('div','svline');
+      const ic=EL('span','svic'); ic.textContent=a.status==='realizado'?'✓':a.status==='faltou'?'✕':'•';
+      ic.style.color=a.status==='realizado'?'var(--win)':a.status==='faltou'?'var(--alert)':'var(--muted)';
+      line.appendChild(ic);
+      const t=EL('span','svtx',(sv.nome||'serviço')+' · '+(pro.nome||''));
+      if(a.status==='faltou')t.style.textDecoration='line-through';
+      line.appendChild(t);
+      const vf=valorAt(a);
+      if(a.status==='realizado'&&vf!=null&&canMoney(a.profissional_id))line.appendChild(EL('span','svval',fmt(vf)));
+      c.appendChild(line);
+    });
+  } else {
+    c.appendChild(EL('div','mini','sem serviço — toque pra agendar'));
+  }
   if(l.proxima_acao) c.appendChild(EL('div','mini','→ '+l.proxima_acao));
   const tags=EL('div','tags');
   if(l.origem) tags.appendChild(EL('span','tag org',l.origem));
   const al=leadAlert(l); if(al) tags.appendChild(EL('span','tag '+al.cls,al.txt));
   if(l.retorno){const dd=Math.ceil((new Date(l.retorno)-new Date())/864e5);if(dd<=7)tags.appendChild(EL('span','tag wn',dd<=0?'retorno hoje':'retorno '+dd+'d'));}
-  if(Number(l.desconto)>0 && canMoney(l.profissional_id)) tags.appendChild(EL('span','tag wn','desc '+fmt(l.desconto)));
-  const vf=valorFinal(l);
-  if(l.etapa==='realizou' && vf!=null) tags.appendChild(EL('span','tag money',fmt(vf)));
   if(tags.children.length) c.appendChild(tags);
-  // quick actions
+  // atalho só pra quem ainda não agendou; marcar serviço é DENTRO do card
   const e=l.etapa||'lead';
   if(['lead','conversa','followup'].includes(e)){
     const qa=EL('div','qa');
-    const ag=EL('button','qb go','📅 Agendar');ag.onclick=ev=>{ev.stopPropagation();openAgendamento(null,{servico_id:l.servico_id,cliente_nome:l.nome,cliente_telefone:l.telefone,lead_id:l.id})};qa.appendChild(ag);
+    const ag=EL('button','qb go','📅 Agendar');ag.onclick=ev=>{ev.stopPropagation();openAgendamento(null,{cliente_nome:l.nome,cliente_telefone:l.telefone,lead_id:l.id})};qa.appendChild(ag);
     if(e!=='followup'){const fu=EL('button','qb','Follow-up');fu.onclick=ev=>{ev.stopPropagation();move(l,'followup')};qa.appendChild(fu);}
     c.appendChild(qa);
-  } else if(e==='agendada'){
-    const qa=EL('div','qa');
-    const ok=EL('button','qb ok','✓ Realizou');ok.onclick=ev=>{ev.stopPropagation();move(l,'realizou')};
-    const no=EL('button','qb no','✕ Faltou');no.onclick=ev=>{ev.stopPropagation();move(l,'naoveio')};
-    qa.appendChild(ok);qa.appendChild(no);c.appendChild(qa);
   }
   return c;
 }
@@ -379,10 +399,19 @@ async function move(l,etapa){
   await sb.from('leads').update(upd).eq('id',l.id);
   await loadAll(); render();
 }
+// marca UM serviço (agendamento) como realizado/faltou, de dentro do card
+async function marcarServico(agId,status,leadId){
+  await sb.from('agendamentos').update({status,realizado_em:status==='realizado'?new Date().toISOString():null}).eq('id',agId);
+  if(status==='realizado'&&leadId){const l=S.leads.find(x=>x.id===leadId);if(l&&!['realizou','naoveio'].includes(l.etapa))await sb.from('leads').update({etapa:'realizou',atualizado_em:new Date().toISOString()}).eq('id',leadId);}
+  await loadAll();
+  document.querySelectorAll('.ov').forEach(o=>o.remove());
+  render();
+  if(leadId) openLead(leadId);
+}
 
 // ---------- LEAD MODAL ----------
 function openLead(id,prefill){
-  const l = id ? {...S.leads.find(x=>x.id===id)} : Object.assign({etapa:'lead',origem:'',servico_id:'',nome:'',telefone:'',nascimento:'',email:'',desconto:0,retorno:'',obs:'',proxima_acao:''}, prefill||{});
+  const l = id ? {...S.leads.find(x=>x.id===id)} : Object.assign({etapa:'lead',origem:'',nome:'',telefone:'',nascimento:'',email:'',instagram:'',retorno:'',obs:'',proxima_acao:''}, prefill||{});
   let etapaVal=l.etapa||'lead';
   const m=EL('div','modal big'); m.appendChild(EL('h3',null,id?(l.nome||'Ficha da cliente'):'Nova cliente'));
   const pills=EL('div','stagepills');
@@ -393,52 +422,62 @@ function openLead(id,prefill){
   const tel=inp('text',l.telefone,'DDD + número');
   const nasc=inp('date',l.nascimento||'');
   const email=inp('email',l.email||'','e-mail (opcional)');
+  const insta=inp('text',l.instagram||'','@usuario');
   const org=sel(ORIGENS.map(o=>[o,o]),l.origem,'— origem —');
-  const serv=sel(S.servicos.map(s=>[s.id,s.nome+' · '+(proById(s.profissional_id).nome||'')]),l.servico_id,'— serviço —');
   const prox=inp('text',l.proxima_acao,'Ex: responder no WhatsApp');
-  const desc=inp('number',l.desconto||0);
   const ret=inp('date',l.retorno||'');
   const obs=document.createElement('textarea');obs.rows=2;obs.value=l.obs||'';obs.placeholder='Preferências, alergias, histórico…';
-  const priceInfo=EL('div','muted'); priceInfo.style.cssText='font-size:13px;margin:-2px 0 6px';
-  const refreshPrice=()=>{
-    const p=S.precos[serv.value];
-    if(!p){priceInfo.textContent='';return;}
-    const d=Number(desc.value)||0, final=Number(p.preco)-d;
-    priceInfo.innerHTML='Preço do serviço: <b>'+fmt(p.preco)+'</b>'+(d>0?' − desconto = <b class="gold">'+fmt(final)+'</b>':'');
-  };
-  serv.onchange=refreshPrice; desc.oninput=refreshPrice;
   m.appendChild(field('Nome',nome)); m.appendChild(field('WhatsApp',tel));
   const two0=EL('div','two'); two0.appendChild(field('Data de nascimento',nasc)); two0.appendChild(field('E-mail',email)); m.appendChild(two0);
-  m.appendChild(field('Origem',org)); m.appendChild(field('Serviço',serv));
+  const two1=EL('div','two'); two1.appendChild(field('Instagram',insta)); two1.appendChild(field('Origem',org)); m.appendChild(two1);
   m.appendChild(field('Próxima ação',prox));
-  m.appendChild(field('Desconto (R$), se teve',desc)); m.appendChild(priceInfo); refreshPrice();
   m.appendChild(field('Data de retorno',ret));
   m.appendChild(field('Observações',obs));
-  if(id && l.telefone){
-    const key=l.telefone.replace(/\D/g,'');
-    const hist=S.leads.filter(x=>x.id!==id && x.etapa==='realizou' && x.telefone && x.telefone.replace(/\D/g,'')===key).sort((a,b)=>new Date(b.realizado_em||0)-new Date(a.realizado_em||0));
-    const hp=EL('div','panel'); hp.style.marginTop='6px';
-    const hh=EL('div','listhead');hh.appendChild(EL('div','eyebrow','Serviços realizados'));
-    const nova=EL('button','btn ghost sm','+ Novo atendimento');nova.onclick=()=>{ov.remove();openLead(null,{nome:l.nome,telefone:l.telefone,nascimento:l.nascimento,origem:l.origem,etapa:'agendada'})};
-    hh.appendChild(nova);hp.appendChild(hh);
-    if(!hist.length) hp.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:6px',textContent:'Primeiro atendimento dela.'}));
-    else hist.forEach(h=>{const row=EL('div','rowline');const sv=servById(h.servico_id);
-      row.appendChild(EL('span',null,(h.realizado_em?new Date(h.realizado_em).toLocaleDateString('pt-BR'):'—')+' · '+(sv.nome||'serviço')));
-      const vf=valorFinal(h);if(vf!=null)row.appendChild(EL('span','muted',fmt(vf)));hp.appendChild(row);});
-    m.appendChild(hp);
+  // ---- SERVIÇOS da cliente (adicionais dentro do card) ----
+  if(id){
+    const sp=EL('div','panel'); sp.style.marginTop='8px';
+    const hh=EL('div','listhead');hh.appendChild(EL('div','eyebrow','Serviços da cliente'));
+    const addS=EL('button','btn ghost sm','+ Serviço');
+    addS.onclick=()=>{ov.remove();openAgendamento(null,{lead_id:id,cliente_nome:nome.value,cliente_telefone:tel.value})};
+    hh.appendChild(addS); sp.appendChild(hh);
+    const servs=servicosDoLead(id);
+    if(!servs.length) sp.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:6px',textContent:'Nenhum serviço ainda. Toque em "+ Serviço".'}));
+    else servs.forEach(a=>{
+      const sv=servById(a.servico_id),pro=proById(a.profissional_id);
+      const row=EL('div','svrow');
+      const topr=EL('div','row spread');
+      const infoc=EL('div');
+      infoc.appendChild(Object.assign(EL('div'),{textContent:sv.nome||'serviço',style:'font-weight:600'}));
+      const metaTxt=[pro.nome, a.inicio?(new Date(a.inicio).toLocaleDateString('pt-BR')+' '+hhmm(new Date(a.inicio))):'', (canMoney(a.profissional_id)&&valorAt(a)!=null)?fmt(valorAt(a)):''].filter(Boolean).join(' · ');
+      infoc.appendChild(Object.assign(EL('div','muted'),{textContent:metaTxt,style:'font-size:12.5px'}));
+      topr.appendChild(infoc);
+      const stt=EL('span','tag '+(a.status==='realizado'?'money':a.status==='faltou'?'al':'org'),statusLabel(a.status));
+      topr.appendChild(stt); row.appendChild(topr);
+      const btns=EL('div','qa'); btns.style.marginTop='9px';
+      const ok=EL('button','qb ok','✓ Realizou');ok.onclick=()=>marcarServico(a.id,'realizado',id);
+      const no=EL('button','qb no','✕ Faltou');no.onclick=()=>marcarServico(a.id,'faltou',id);
+      const ed=EL('button','qb','Editar');ed.onclick=()=>{ov.remove();openAgendamento(a,{})};
+      btns.appendChild(ok);btns.appendChild(no);btns.appendChild(ed);
+      row.appendChild(btns); sp.appendChild(row);
+    });
+    m.appendChild(sp);
   }
   const act=EL('div','mactions');
-  if(id&&isAdmin()){const del=EL('button','btn ghost sm','Excluir');del.onclick=async()=>{await sb.from('leads').delete().eq('id',id);ov.remove();await loadAll();render()};del.style.marginRight='auto';act.appendChild(del);}
+  if(id&&isAdmin()){const del=EL('button','btn ghost sm','Excluir cliente');del.onclick=async()=>{await sb.from('leads').delete().eq('id',id);ov.remove();await loadAll();render()};del.style.marginRight='auto';act.appendChild(del);}
   const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
   const save=EL('button','btn','Salvar');
   save.onclick=async()=>{
-    const proId=servById(serv.value).profissional_id||l.profissional_id||S.me.id;
-    const data={nome:nome.value.trim(),telefone:tel.value.trim(),nascimento:nasc.value||null,email:email.value.trim()||null,origem:org.value,servico_id:serv.value||null,
-      profissional_id:proId,etapa:etapaVal,proxima_acao:prox.value.trim()||null,desconto:Number(desc.value)||0,retorno:ret.value||null,obs:obs.value.trim(),
-      atualizado_em:new Date().toISOString()};
+    const data={nome:nome.value.trim(),telefone:tel.value.trim(),nascimento:nasc.value||null,email:email.value.trim()||null,instagram:insta.value.trim()||null,origem:org.value,
+      etapa:etapaVal,proxima_acao:prox.value.trim()||null,retorno:ret.value||null,obs:obs.value.trim(),atualizado_em:new Date().toISOString()};
     if(etapaVal==='realizou') data.realizado_em = l.realizado_em || new Date().toISOString();
     if(id){ await sb.from('leads').update(data).eq('id',id); }
-    else { await sb.from('leads').insert(data); }
+    else {
+      // evita duplicar cliente: se já existe telefone igual, atualiza em vez de criar outro card
+      const key=(tel.value||'').replace(/\D/g,'');
+      const ex = key && S.leads.find(x=>x.telefone && x.telefone.replace(/\D/g,'')===key);
+      if(ex){ await sb.from('leads').update(data).eq('id',ex.id); }
+      else { data.criado_em=new Date().toISOString(); await sb.from('leads').insert(data); }
+    }
     ov.remove(); await loadAll(); render();
   };
   act.appendChild(cancel); act.appendChild(save); m.appendChild(act);
@@ -509,11 +548,11 @@ function openServ(id){
 const inRange=d=>{const x=(d||'').slice(0,10);return x>=S.dashFrom && x<=S.dashTo};
 function mesesNoRange(){const set=new Set();let [y,m]=S.dashFrom.slice(0,7).split('-').map(Number);const end=S.dashTo.slice(0,7);while(true){const k=y+'-'+String(m).padStart(2,'0');set.add(k);if(k>=end)break;m++;if(m>12){m=1;y++}if(set.size>60)break}return set}
 function vendasMes(proId){
-  return S.leads.filter(l=>l.etapa==='realizou' && valorFinal(l)!=null && inRange(l.realizado_em||l.criado_em) && (!proId||l.profissional_id===proId));
+  return S.agendamentos.filter(a=>a.status==='realizado' && valorAt(a)!=null && inRange(a.realizado_em||a.inicio) && (!proId||a.profissional_id===proId));
 }
 function resumo(proId){
-  const v=vendasMes(proId); const fat=v.reduce((s,l)=>s+(valorFinal(l)||0),0);
-  const custo=v.reduce((s,l)=>s+(custoDe(l)||0),0);
+  const v=vendasMes(proId); const fat=v.reduce((s,a)=>s+(valorAt(a)||0),0);
+  const custo=v.reduce((s,a)=>s+(custoAt(a)||0),0);
   return {fat,custo,n:v.length,ticket:v.length?fat/v.length:0};
 }
 function viewPainel(){
@@ -521,7 +560,7 @@ function viewPainel(){
   w.appendChild(rangeBar());
   if(isAdmin()){
     // visão geral
-    let fatT=0; vendasMes().forEach(l=>fatT+=valorFinal(l)||0);
+    let fatT=0; vendasMes().forEach(a=>fatT+=valorAt(a)||0);
     const cx=caixa();
     const g=EL('div','grid');
     g.appendChild(tile('Faturamento do studio',fmt(fatT)));
@@ -581,7 +620,7 @@ function rangeBar(){
 }
 function tile(k,v,cls){const t=EL('div','tile');t.appendChild(EL('div','k',k));t.appendChild(Object.assign(EL('div','v'+(cls?' '+cls:'')),{textContent:v}));return t}
 function caixa(){
-  let entradas=0; vendasMes().forEach(l=>{const p=proById(l.profissional_id);if(!p.socia)entradas+=(valorFinal(l)||0)*0.30});
+  let entradas=0; vendasMes().forEach(a=>{const p=proById(a.profissional_id);if(!p.socia)entradas+=(valorAt(a)||0)*0.30});
   const meses=mesesNoRange();
   const gastos=S.despesas.filter(d=>meses.has(monthKey(d.mes))).reduce((s,d)=>s+(Number(d.valor)||0),0);
   const fixo=(Number(S.config.custo_total_mes)||0)*meses.size;
@@ -759,14 +798,21 @@ function openAgendamento(ag,prefill){
   const data=inp('date', ag?ag.inicio.slice(0,10):S.agDay);
   const hora=inp('time', ag?hhmm(new Date(ag.inicio)):(prefill.hora||'09:00'));
   const obs=document.createElement('textarea');obs.rows=2;obs.value=ag?(ag.obs||''):'';obs.placeholder='Observações';
+  const desc=inp('number', ag?(ag.desconto||0):0);
   const info=EL('div','muted');info.style.cssText='font-size:13px;margin:-2px 0 6px';
   const warn=EL('div');warn.style.cssText='font-size:13px;margin:4px 0';
   let confirmed=false;
   const resetConf=()=>{confirmed=false;save.textContent='Salvar';warn.textContent=''};
-  const refresh=()=>{const s=servById(serv.value),p=proById(s.profissional_id);info.innerHTML=s.id?('Profissional: <b>'+(p.nome||'?')+'</b> · duração '+(s.tempo_min||30)+' min'):''};
-  serv.onchange=()=>{refresh();resetConf()}; data.oninput=resetConf; hora.oninput=resetConf;
+  const refresh=()=>{const s=servById(serv.value),p=proById(s.profissional_id);
+    if(!s.id){info.textContent='';return;}
+    let txt='Profissional: <b>'+(p.nome||'?')+'</b> · duração '+(s.tempo_min||30)+' min';
+    const pr=S.precos[s.id];
+    if(pr&&canMoney(s.profissional_id)){const d=Number(desc.value)||0;txt+=' · <b class="gold">'+fmt(Number(pr.preco)-d)+'</b>'+(d>0?' (desc '+fmt(d)+')':'');}
+    info.innerHTML=txt;};
+  serv.onchange=()=>{refresh();resetConf()}; data.oninput=resetConf; hora.oninput=resetConf; desc.oninput=()=>{refresh();resetConf()};
   m.appendChild(field('Cliente',nome)); m.appendChild(field('WhatsApp',tel)); m.appendChild(field('Serviço',serv)); m.appendChild(info); refresh();
   const two=EL('div','two'); two.appendChild(field('Data',data)); two.appendChild(field('Hora',hora)); m.appendChild(two);
+  m.appendChild(field('Desconto (R$), se teve',desc));
   m.appendChild(field('Observações',obs)); m.appendChild(warn);
   const act=EL('div','mactions');
   if(isEdit){const del=EL('button','btn ghost sm','Excluir');del.style.marginRight='auto';del.onclick=async()=>{await sb.from('agendamentos').delete().eq('id',ag.id);ov.remove();await loadAll();render()};act.appendChild(del);}
@@ -784,11 +830,21 @@ function openAgendamento(ag,prefill){
       warn.style.color='var(--warn)'; confirmed=true; save.textContent='Agendar mesmo assim'; return;
     }
     save.textContent='Salvando…';
-    const row={cliente_nome:nome.value.trim(),cliente_telefone:tel.value.trim()||null,servico_id:serv.value,profissional_id:proId,inicio:inicio.toISOString(),fim:fim.toISOString(),obs:obs.value.trim()||null,status:'marcado'};
-    if(prefill.lead_id) row.lead_id=prefill.lead_id;
+    const row={cliente_nome:nome.value.trim(),cliente_telefone:tel.value.trim()||null,servico_id:serv.value,profissional_id:proId,inicio:inicio.toISOString(),fim:fim.toISOString(),desconto:Number(desc.value)||0,obs:obs.value.trim()||null};
+    if(!isEdit) row.status='marcado';
+    // todo serviço pertence a um card de cliente — acha ou cria (sem duplicar)
+    let leadId = prefill.lead_id || (isEdit?ag.lead_id:null);
+    if(!leadId){
+      const key=(tel.value||'').replace(/\D/g,'');
+      let ex = key && S.leads.find(x=>x.telefone && x.telefone.replace(/\D/g,'')===key);
+      if(!ex && nome.value.trim()) ex = S.leads.find(x=>(x.nome||'').trim().toLowerCase()===nome.value.trim().toLowerCase());
+      if(ex) leadId=ex.id;
+      else{const {data:ins}=await sb.from('leads').insert({nome:nome.value.trim()||'Cliente',telefone:tel.value.trim()||null,etapa:'agendada',criado_em:new Date().toISOString(),atualizado_em:new Date().toISOString()}).select().single();leadId=ins?.id;}
+    }
+    if(leadId) row.lead_id=leadId;
     if(isEdit) await sb.from('agendamentos').update(row).eq('id',ag.id);
     else await sb.from('agendamentos').insert(row);
-    if(prefill.lead_id) await sb.from('leads').update({etapa:'agendada',atualizado_em:new Date().toISOString()}).eq('id',prefill.lead_id);
+    if(leadId){const ld=S.leads.find(x=>x.id===leadId);if(!ld||!['realizou','naoveio'].includes(ld.etapa))await sb.from('leads').update({etapa:'agendada',atualizado_em:new Date().toISOString()}).eq('id',leadId);}
     ov.remove(); await loadAll(); render();
   };
   act.appendChild(cancel);act.appendChild(save);m.appendChild(act);
@@ -833,7 +889,7 @@ function viewClientes(){
   search.style.cssText='width:100%;max-width:340px;padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--surface);color:var(--ink);margin-top:6px';
   w.appendChild(search);
   const map={};
-  S.leads.forEach(l=>{const key=(l.telefone||'').replace(/\D/g,'')||('n:'+(l.nome||'').toLowerCase());if(!key)return;if(!map[key])map[key]={nome:l.nome,telefone:l.telefone,nascimento:l.nascimento,email:l.email,origem:l.origem,leads:[]};map[key].leads.push(l);if(l.nascimento&&!map[key].nascimento)map[key].nascimento=l.nascimento;if(l.email&&!map[key].email)map[key].email=l.email;});
+  S.leads.forEach(l=>{const key=(l.telefone||'').replace(/\D/g,'')||('n:'+(l.nome||'').toLowerCase());if(!key)return;if(!map[key])map[key]={nome:l.nome,telefone:l.telefone,nascimento:l.nascimento,email:l.email,instagram:l.instagram,origem:l.origem,leads:[]};map[key].leads.push(l);if(l.nascimento&&!map[key].nascimento)map[key].nascimento=l.nascimento;if(l.email&&!map[key].email)map[key].email=l.email;if(l.instagram&&!map[key].instagram)map[key].instagram=l.instagram;});
   const list=EL('div','panel'); list.style.marginTop='12px';
   const draw=()=>{
     list.innerHTML='';
@@ -841,11 +897,12 @@ function viewClientes(){
     const arr=Object.values(map).filter(c=>!q||(c.nome||'').toLowerCase().includes(q)||(c.telefone||'').includes(q)).sort((a,b)=>(a.nome||'').localeCompare(b.nome||''));
     if(!arr.length){list.appendChild(Object.assign(EL('div','empty'),{textContent:'Nenhuma cliente ainda.'}));return;}
     arr.forEach(c=>{
-      const realizados=c.leads.filter(l=>l.etapa==='realizou').length;
+      const ids=c.leads.map(l=>l.id);
+      const realizados=S.agendamentos.filter(a=>ids.includes(a.lead_id)&&a.status==='realizado').length;
       const row=EL('div','rowline'); row.style.cursor='pointer';
       const left=EL('div');
       left.appendChild(Object.assign(EL('div'),{textContent:c.nome||'—',style:'font-weight:600'}));
-      const sub=[c.telefone,c.nascimento?('🎂 '+brDate(c.nascimento,{day:'2-digit',month:'2-digit'})):'',c.email,c.origem].filter(Boolean).join(' · ');
+      const sub=[c.telefone,c.nascimento?('🎂 '+brDate(c.nascimento,{day:'2-digit',month:'2-digit'})):'',c.email,c.instagram,c.origem].filter(Boolean).join(' · ');
       left.appendChild(Object.assign(EL('div','muted'),{textContent:sub||'—',style:'font-size:12.5px'}));
       row.appendChild(left);
       row.appendChild(Object.assign(EL('span','muted'),{textContent:realizados+' atend.',style:'font-size:12.5px;white-space:nowrap'}));
@@ -861,26 +918,28 @@ function viewClientes(){
 function openCliente(c){
   const m=EL('div','modal big'); m.appendChild(EL('h3',null,c.nome||'Cliente'));
   const info=EL('div','muted');info.style.cssText='font-size:13.5px;margin-bottom:12px';
-  info.textContent=[c.telefone,c.nascimento?('🎂 '+brDate(c.nascimento,{day:'2-digit',month:'long'})):'',c.email,c.origem].filter(Boolean).join('  ·  ');
+  info.textContent=[c.telefone,c.nascimento?('🎂 '+brDate(c.nascimento,{day:'2-digit',month:'long'})):'',c.email,c.instagram,c.origem].filter(Boolean).join('  ·  ');
   m.appendChild(info);
-  const realizados=c.leads.filter(l=>l.etapa==='realizou');
-  const fat=realizados.reduce((s,l)=>s+(valorFinal(l)||0),0);
+  const ids=c.leads.map(l=>l.id);
+  const servs=S.agendamentos.filter(a=>ids.includes(a.lead_id)&&a.status!=='cancelado');
+  const realizados=servs.filter(a=>a.status==='realizado');
+  const fat=realizados.reduce((s,a)=>s+(valorAt(a)||0),0);
   const g=EL('div','grid');
   g.appendChild(tile('Atendimentos',String(realizados.length)));
   g.appendChild(tile('Total já gasto',fmt(fat)));
-  const lastV=realizados.map(l=>l.realizado_em).filter(Boolean).sort().slice(-1)[0];
+  const lastV=realizados.map(a=>a.realizado_em||a.inicio).filter(Boolean).sort().slice(-1)[0];
   g.appendChild(tile('Último atendimento', lastV?new Date(lastV).toLocaleDateString('pt-BR'):'—'));
   m.appendChild(g);
   const hp=EL('div','panel');hp.style.marginTop='14px';hp.appendChild(EL('div','eyebrow','Histórico de atendimentos'));
   if(!realizados.length) hp.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:6px',textContent:'Ainda não fez nenhum atendimento.'}));
-  else [...realizados].sort((a,b)=>(b.realizado_em||'').localeCompare(a.realizado_em||'')).forEach(l=>{
-    const sv=servById(l.servico_id),pro=proById(l.profissional_id);const row=EL('div','rowline');
-    row.appendChild(EL('span',null,(l.realizado_em?new Date(l.realizado_em).toLocaleDateString('pt-BR'):'—')+' · '+(sv.nome||'serviço')+(pro.nome?' · '+pro.nome:'')));
-    const vf=valorFinal(l);if(vf!=null)row.appendChild(Object.assign(EL('span','muted'),{textContent:fmt(vf)}));hp.appendChild(row);
+  else [...realizados].sort((a,b)=>new Date(b.realizado_em||b.inicio||0)-new Date(a.realizado_em||a.inicio||0)).forEach(a=>{
+    const sv=servById(a.servico_id),pro=proById(a.profissional_id);const row=EL('div','rowline');
+    const quando=a.realizado_em||a.inicio;
+    row.appendChild(EL('span',null,(quando?new Date(quando).toLocaleDateString('pt-BR'):'—')+' · '+(sv.nome||'serviço')+(pro.nome?' · '+pro.nome:'')));
+    const vf=valorAt(a);if(vf!=null&&canMoney(a.profissional_id))row.appendChild(Object.assign(EL('span','muted'),{textContent:fmt(vf)}));hp.appendChild(row);
   });
   m.appendChild(hp);
-  const key=(c.telefone||'').replace(/\D/g,'');
-  const futuros=S.agendamentos.filter(a=>a.cliente_telefone&&a.cliente_telefone.replace(/\D/g,'')===key&&new Date(a.inicio)>=new Date()&&a.status!=='cancelado').sort((a,b)=>new Date(a.inicio)-new Date(b.inicio));
+  const futuros=servs.filter(a=>a.status==='marcado'&&new Date(a.inicio)>=new Date()).sort((a,b)=>new Date(a.inicio)-new Date(b.inicio));
   if(futuros.length){const fp=EL('div','panel');fp.appendChild(EL('div','eyebrow','Próximos agendamentos'));futuros.forEach(a=>{const sv=servById(a.servico_id),pro=proById(a.profissional_id);fp.appendChild(Object.assign(EL('div','rowline'),{textContent:new Date(a.inicio).toLocaleDateString('pt-BR')+' '+hhmm(new Date(a.inicio))+' · '+(sv.nome||'')+(pro.nome?' · '+pro.nome:'')}))});m.appendChild(fp);}
   const act=EL('div','mactions');
   const close=EL('button','btn ghost','Fechar');close.onclick=()=>ov.remove();
