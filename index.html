@@ -395,8 +395,10 @@ function cardLead(l){
   const al=leadAlert(l); if(al) tags.appendChild(EL('span','tag '+al.cls,al.txt));
   if(l.retorno){const dd=Math.ceil((new Date(l.retorno)-new Date())/864e5);if(dd<=7)tags.appendChild(EL('span','tag wn',dd<=0?'retorno hoje':'retorno '+dd+'d'));}
   const bd=bdayInfo(l.nascimento);
-  if(bd&&bd.today){tags.appendChild(EL('span','tag money','🎂 aniversário hoje'));c.style.background='var(--goldsoft)';}
-  else if(bd&&bd.daysTo<=7)tags.appendChild(EL('span','tag wn','🎂 dia '+String(bd.dia).padStart(2,'0')));
+  if(bd){
+    if(bd.today){tags.appendChild(EL('span','tag money','🎂 aniversário hoje'));c.style.background='var(--goldsoft)';}
+    else tags.appendChild(EL('span','tag','🎂 '+String(bd.dia).padStart(2,'0')+'/'+String(bd.mes+1).padStart(2,'0')));
+  }
   if(tags.children.length) c.appendChild(tags);
   // atalho só pra quem ainda não agendou; marcar serviço é DENTRO do card
   const e=l.etapa||'lead';
