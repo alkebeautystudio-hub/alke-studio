@@ -811,9 +811,10 @@ function viewAgenda(){
   else {lab.textContent=brDate(S.agDay,{weekday:'long',day:'2-digit',month:'long'});lab.style.textTransform='capitalize';}
   const tog=EL('div','segtog');
   [['dia','Dia'],['semana','Semana']].forEach(([k,l])=>{const b=EL('button',S.agView===k?'on':'',l);b.onclick=()=>{S.agView=k;render()};tog.appendChild(b)});
+  const trava=EL('button','btn ghost','🔒 Travar'); trava.onclick=()=>openBloqueio(null,{});
   const add=EL('button','btn','+ Agendar'); add.onclick=()=>openAgendamento(null,{});
   [prev,lab,next,hoje,tog].forEach(e=>bar.appendChild(e));
-  const sp=EL('div');sp.style.marginLeft='auto';bar.appendChild(sp);bar.appendChild(add);
+  const sp=EL('div');sp.style.marginLeft='auto';bar.appendChild(sp);bar.appendChild(trava);bar.appendChild(add);
   w.appendChild(bar);
   const pros=S.pros.filter(p=>p.presta_servico!==false);
   if(!pros.length){w.appendChild(Object.assign(EL('div','muted'),{style:'margin-top:14px',textContent:'Cadastre profissionais na aba Equipe primeiro.'}));return w;}
@@ -845,6 +846,16 @@ function agBlock(a,narrow){
   blk.style.height=Math.max(narrow?18:22,((ft-st)/3600000)*HPX)+'px';
   const total=a._total||1,lane=a._lane||0;
   blk.style.left='calc('+(lane*100/total)+'% + 2px)'; blk.style.width='calc('+(100/total)+'% - 4px)'; blk.style.right='auto';
+  if(a.bloqueio){
+    blk.style.background='repeating-linear-gradient(45deg,var(--line) 0 7px,var(--surface) 7px 14px)';
+    blk.style.borderLeftColor='var(--muted)'; if(narrow)blk.style.fontSize='10px';
+    blk.appendChild(Object.assign(EL('b'),{textContent:'🔒 '+hhmm(st)+'–'+hhmm(ft)+(a.obs&&a.obs!=='Bloqueado'?' · '+a.obs:'')}));
+    blk.appendChild(Object.assign(EL('div'),{textContent:p.nome||'',style:'font-size:9.5px;opacity:.72;white-space:nowrap;overflow:hidden'}));
+    const x=EL('span'); x.textContent='×'; x.title='Remover trava'; x.style.cssText='position:absolute;top:1px;right:5px;cursor:pointer;font-weight:700;font-size:15px;opacity:.6;line-height:1';
+    x.onclick=ev=>{ev.stopPropagation();delBloqueio(a)};
+    blk.appendChild(x);
+    return blk;
+  }
   blk.style.background='color-mix(in srgb,'+(p.cor||'#A8823A')+' 16%, var(--surface))';
   blk.style.borderLeftColor=p.cor||'#A8823A'; if(narrow)blk.style.fontSize='10px';
   blk.appendChild(Object.assign(EL('b'),{textContent:hhmm(st)+' '+(a.cliente_nome||'Cliente')}));
@@ -860,7 +871,7 @@ function agDay(pros){
     const body=EL('div','agbody'); body.style.height=((AG1-AG0)*HPX)+'px';
     for(let h=AG0;h<AG1;h++)body.appendChild(EL('div','aghour'));
     body.onclick=ev=>{if(ev.target!==body)return;const r=body.getBoundingClientRect();const mins=Math.max(0,Math.round(((ev.clientY-r.top)/HPX)*60/15)*15);openAgendamento(null,{profissional_id:p.id,hora:String(AG0+Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0')})};
-    layoutCol(dayAgs.filter(a=>a.profissional_id===p.id)).forEach(a=>{const blk=agBlock(a,false);blk.onclick=ev=>{ev.stopPropagation();openAgendamento(a,{})};body.appendChild(blk);});
+    layoutCol(dayAgs.filter(a=>a.profissional_id===p.id)).forEach(a=>{const blk=agBlock(a,false);blk.onclick=ev=>{ev.stopPropagation();a.bloqueio?openBloqueio(a,{}):openAgendamento(a,{})};body.appendChild(blk);});
     col.appendChild(body); wrap.appendChild(col);
   });
   return wrap;
@@ -877,7 +888,7 @@ function agWeek(pros){
     const body=EL('div','agbody'); body.style.height=((AG1-AG0)*HPX)+'px'; if(day===today)body.style.background='color-mix(in srgb,var(--gold) 6%,transparent)';
     for(let h=AG0;h<AG1;h++)body.appendChild(EL('div','aghour'));
     body.onclick=ev=>{if(ev.target!==body)return;const r=body.getBoundingClientRect();const mins=Math.max(0,Math.round(((ev.clientY-r.top)/HPX)*60/15)*15);S.agDay=day;openAgendamento(null,{hora:String(AG0+Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0')})};
-    layoutCol(S.agendamentos.filter(a=>a.inicio&&a.inicio.slice(0,10)===day&&a.status!=='cancelado')).forEach(a=>{const blk=agBlock(a,true);blk.onclick=ev=>{ev.stopPropagation();S.agDay=day;openAgendamento(a,{})};body.appendChild(blk);});
+    layoutCol(S.agendamentos.filter(a=>a.inicio&&a.inicio.slice(0,10)===day&&a.status!=='cancelado')).forEach(a=>{const blk=agBlock(a,true);blk.onclick=ev=>{ev.stopPropagation();S.agDay=day;a.bloqueio?openBloqueio(a,{}):openAgendamento(a,{})};body.appendChild(blk);});
     col.appendChild(body); wrap.appendChild(col);
   }
   return wrap;
@@ -920,7 +931,7 @@ function openAgendamento(ag,prefill){
     const conf=S.agendamentos.find(a=>a.profissional_id===proId && (!ag||a.id!==ag.id) && a.status!=='cancelado' && a.inicio && (new Date(a.inicio)<fim) && (new Date(a.fim||a.inicio)>inicio));
     if(conf && !confirmed){
       const p=proById(proId);
-      warn.innerHTML='⚠️ <b>'+(p.nome||'')+'</b> já tem <b>'+(conf.cliente_nome||'uma cliente')+'</b> nesse horário ('+hhmm(new Date(conf.inicio))+'). Agendar mesmo assim?';
+      warn.innerHTML='⚠️ <b>'+(p.nome||'')+'</b> já tem <b>'+(conf.bloqueio?('um horário travado'+(conf.obs?' ('+conf.obs+')':'')):(conf.cliente_nome||'uma cliente'))+'</b> nesse horário ('+hhmm(new Date(conf.inicio))+'). Agendar mesmo assim?';
       warn.style.color='var(--warn)'; confirmed=true; save.textContent='Agendar mesmo assim'; return;
     }
     save.textContent='Salvando…';
@@ -957,6 +968,51 @@ function openAgendamento(ag,prefill){
   act.appendChild(cancel);act.appendChild(save);m.appendChild(act);
   const ov=overlay(m); nome.focus();
 }
+// ---------- TRAVAR HORÁRIO (bloqueio) ----------
+async function delBloqueio(a){
+  try{if(a.google_event_id)await sb.functions.invoke('agenda-sync',{body:{action:'delete',event_id:a.google_event_id}});}catch(_){}
+  await sb.from('agendamentos').delete().eq('id',a.id); await loadAll(); render();
+}
+function openBloqueio(ag,prefill){
+  prefill=prefill||{}; const isEdit=!!ag;
+  const m=EL('div','modal'); m.appendChild(EL('h3',null,isEdit?'Horário travado':'🔒 Travar horário'));
+  m.appendChild(Object.assign(EL('p','muted'),{style:'margin:-4px 0 10px;font-size:13px',textContent:'Bloqueia o horário de uma profissional pra compromisso pessoal. Ninguém consegue marcar cliente nesse horário.'}));
+  const proOpts=S.pros.filter(p=>p.presta_servico!==false).map(p=>[p.id,p.nome]);
+  const defPro = ag?ag.profissional_id : (prefill.profissional_id || (isAdmin()?'':S.me.id));
+  const pro=sel(proOpts, defPro, '— profissional —'); if(!isAdmin()){pro.value=S.me.id;pro.disabled=true;}
+  const data=inp('date', ag?ag.inicio.slice(0,10):(prefill.data||S.agDay));
+  const hi=inp('time', ag?hhmm(new Date(ag.inicio)):(prefill.hora||'09:00'));
+  const hf=inp('time', ag?hhmm(new Date(ag.fim)):(prefill.horaFim||'10:00'));
+  const motivo=inp('text', ag?(ag.obs||''):'', 'Ex: médico, reunião, folga');
+  m.appendChild(field('Profissional',pro));
+  m.appendChild(field('Data',data));
+  const two=EL('div','two'); two.appendChild(field('Início',hi)); two.appendChild(field('Fim',hf)); m.appendChild(two);
+  m.appendChild(field('Motivo',motivo));
+  const warn=EL('div'); warn.style.cssText='font-size:13px;margin:4px 0';
+  m.appendChild(warn);
+  const act=EL('div','mactions');
+  if(isEdit){const del=EL('button','btn ghost sm','Remover trava');del.style.marginRight='auto';del.onclick=async()=>{ov.remove();await delBloqueio(ag)};act.appendChild(del);}
+  const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
+  const save=EL('button','btn','Travar');
+  save.onclick=async()=>{
+    const proId=pro.value; if(!proId){warn.textContent='Escolha a profissional.';warn.style.color='var(--alert)';return;}
+    const inicio=new Date(data.value+'T'+hi.value+':00'), fim=new Date(data.value+'T'+hf.value+':00');
+    if(fim<=inicio){warn.textContent='O horário de fim tem que ser depois do início.';warn.style.color='var(--alert)';return;}
+    save.textContent='Salvando…';
+    const row={profissional_id:proId,inicio:inicio.toISOString(),fim:fim.toISOString(),bloqueio:true,obs:motivo.value.trim()||'Bloqueado',status:'marcado',cliente_nome:null,cliente_telefone:null,servico_id:null};
+    let gid=isEdit?ag.google_event_id:null, agId=isEdit?ag.id:null;
+    if(isEdit) await sb.from('agendamentos').update(row).eq('id',ag.id);
+    else { const {data:ins}=await sb.from('agendamentos').insert(row).select().single(); agId=ins&&ins.id; }
+    try{
+      const pp=proById(proId)||{};
+      const gr=await sb.functions.invoke('agenda-sync',{body:{titulo:'🔒 '+(motivo.value.trim()||'Bloqueado')+' · '+(pp.nome||''),descricao:'Horário travado no sistema',inicio:inicio.toISOString(),fim:fim.toISOString(),convidado_email:pp.email||undefined,event_id:gid||undefined}});
+      const newId=gr&&gr.data&&gr.data.id; if(newId&&newId!==gid&&agId) await sb.from('agendamentos').update({google_event_id:newId}).eq('id',agId);
+    }catch(_){}
+    ov.remove(); await loadAll(); render();
+  };
+  act.appendChild(cancel); act.appendChild(save); m.appendChild(act);
+  const ov=overlay(m);
+}
 // ---------- MEU DIA ----------
 function viewMeuDia(){
   const w=EL('div'); const hoje=new Date().toISOString().slice(0,10);
@@ -970,7 +1026,7 @@ function viewMeuDia(){
     w.appendChild(chips);
   }
   const base = proFilter ? S.agendamentos.filter(a=>a.profissional_id===proFilter) : S.agendamentos;
-  const todays = base.filter(a=>a.inicio && a.inicio.slice(0,10)===hoje && a.status!=='cancelado').sort((a,b)=>new Date(a.inicio)-new Date(b.inicio));
+  const todays = base.filter(a=>a.inicio && a.inicio.slice(0,10)===hoje && a.status!=='cancelado' && !a.bloqueio).sort((a,b)=>new Date(a.inicio)-new Date(b.inicio));
   const pan=EL('div','panel'); pan.style.marginTop='14px';
   if(!todays.length){pan.appendChild(Object.assign(EL('div','empty'),{textContent:'Nenhum atendimento hoje. Quando agendar, aparece aqui.'}));w.appendChild(pan);return w;}
   todays.forEach(a=>{
