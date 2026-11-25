@@ -294,7 +294,7 @@ const statusLabel=s=>s==='realizado'?'realizado':s==='faltou'?'faltou':s==='canc
 function openDrawer(){document.querySelector('.side')?.classList.add('open');document.getElementById('drawov')?.classList.add('on')}
 function closeDrawer(){document.querySelector('.side')?.classList.remove('open');document.getElementById('drawov')?.classList.remove('on')}
 function renderShell(){
-  let tabs=[['meudia','Meu dia','☀'],['funil','Funil','◇'],['agenda','Agenda','▦'],['clientes','Clientes','♥'],['aniversarios','Aniversários','🎂'],['servicos','Serviços','✦'],['painel','Painel','◉']];
+  let tabs=[['meudia','Meu dia','☀'],['funil','Funil','◇'],['agenda','Agenda','▦'],['clientes','Clientes','♥'],['aniversarios','Aniversários','🎂'],['servicos','Serviços','✦'],['painel','Dashboard','◉']];
   tabs=tabs.filter(t=>{ if(t[0]==='funil')return canTab('funil'); if(t[0]==='servicos')return canTab('servicos'); return true; });
   if(isAdmin()){tabs.push(['meta','Meta','❖']);tabs.push(['equipe','Equipe','♛']);}
   const nav=document.getElementById('nav'); nav.innerHTML='';
@@ -629,10 +629,35 @@ function resumo(proId){
   return {fat,custo,n:v.length,ticket:v.length?fat/v.length:0};
 }
 function viewPainel(){
-  const w=EL('div'); w.appendChild(pageHead('Painel', S.me.nome));
+  const w=EL('div'); w.appendChild(pageHead('Dashboard', S.me.nome));
   w.appendChild(rangeBar());
   if(isAdmin()){
-    // visão geral
+    S.dashPro = S.dashPro||null;
+    // seletor: Geral ou a visão completa de uma profissional
+    const chips=EL('div','rangebar'); chips.style.marginTop='6px';
+    const mk=(label,val)=>{const b=EL('button','qk'+(S.dashPro===val?' on':''),label);b.onclick=()=>{S.dashPro=val;render()};return b};
+    chips.appendChild(mk('Geral',null));
+    S.pros.filter(p=>p.presta_servico!==false).forEach(p=>chips.appendChild(mk(p.nome,p.id)));
+    w.appendChild(chips);
+    if(S.dashPro){
+      const pro=proById(S.dashPro); const r=resumo(S.dashPro); const naoSocia=!pro.socia; const pct=pctPro(pro);
+      const g=EL('div','grid');
+      g.appendChild(tile('Faturamento (real)',fmt(r.fat)));
+      g.appendChild(tile('Atendimentos',String(r.n)));
+      g.appendChild(tile('Ticket médio',fmt(r.ticket)));
+      if(naoSocia){
+        g.appendChild(tile('Líquido dela ('+(100-pct)+'%)',fmt(r.fat*(1-pct/100)),'pos'));
+        g.appendChild(tile('Repasse ao studio ('+pct+'%)',fmt(r.fat*pct/100),'neg'));
+        g.appendChild(tile('Custo material',fmt(r.custo),'neg'));
+      } else {
+        g.appendChild(tile('Custo material',fmt(r.custo),'neg'));
+        g.appendChild(tile('Lucro (fat − custo)',fmt(r.fat-r.custo),'pos'));
+      }
+      w.appendChild(g);
+      w.appendChild(historicoPanel(S.dashPro,{bruto:true,pct:naoSocia?pct:0}));
+      return w;
+    }
+    // GERAL
     let fatT=0; vendasMes().forEach(a=>fatT+=valorAt(a)||0);
     const cx=caixa();
     const g=EL('div','grid');
@@ -641,20 +666,22 @@ function viewPainel(){
     g.appendChild(tile('Caixa do studio',fmt(cx.saldo),cx.saldo>=0?'pos':'neg'));
     w.appendChild(g);
     const pan=EL('div','panel'); pan.appendChild(EL('h3',null,'Por profissional'));
+    pan.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:-4px;font-size:12.5px',textContent:'Toque numa profissional pra ver tudo dela em detalhe.'}));
     S.pros.filter(p=>p.presta_servico!==false).forEach(p=>{
-      const r=resumo(p.id); const row=EL('div','rowline');
+      const r=resumo(p.id); const row=EL('div','rowline'); row.style.cursor='pointer';
       const left=EL('div');const dot=EL('span','dot');dot.style.background=p.cor;dot.style.marginRight='8px';
       const nm=EL('span');nm.appendChild(dot);nm.appendChild(document.createTextNode(p.nome));left.appendChild(nm);
       row.appendChild(left);
       const rr=EL('div','muted');rr.innerHTML='fat. <b style="color:var(--ink)">'+fmt(r.fat)+'</b> &nbsp;·&nbsp; '+r.n+' atend.';
-      row.appendChild(rr); pan.appendChild(row);
+      row.appendChild(rr); row.onclick=()=>{S.dashPro=p.id;render()}; pan.appendChild(row);
     });
     w.appendChild(pan);
+    w.appendChild(historicoPanel(null,{bruto:true}));
     w.appendChild(caixaPanel()); w.appendChild(despesasPanel());
     w.appendChild(aniversariantesPanel());
     return w;
   }
-  // profissional: só o dela
+  // sócia / profissional
   const r=resumo(S.me.id);
   const g=EL('div','grid');
   if(S.me.socia){
@@ -663,17 +690,51 @@ function viewPainel(){
     g.appendChild(tile('Ticket médio',fmt(r.ticket)));
     g.appendChild(tile('Lucro',fmt(r.fat-r.custo+caixa().saldo/2),'pos'));
     w.appendChild(g);
+    w.appendChild(historicoPanel(S.me.id,{bruto:true}));
     w.appendChild(caixaPanel()); w.appendChild(despesasPanel());
   } else {
-    // profissional vê só o valor dela, já limpo (a % já sai descontada, sem mencionar)
     const net=r.fat*(1-pctPro(S.me)/100);
     g.appendChild(tile('Seu faturamento',fmt(net)));
     g.appendChild(tile('Atendimentos',String(r.n)));
     g.appendChild(tile('Ticket médio',fmt(r.n?net/r.n:0)));
     w.appendChild(g);
+    w.appendChild(historicoPanel(S.me.id,{clean:true}));
   }
   w.appendChild(aniversariantesPanel());
   return w;
+}
+// histórico de atendimentos agrupado por dia (usa o filtro de datas de cima)
+function historicoPanel(proId,opts){
+  opts=opts||{};
+  const list=vendasMes(proId).slice().sort((a,b)=>new Date(b.realizado_em||b.inicio||0)-new Date(a.realizado_em||a.inicio||0));
+  const p=EL('div','panel'); const h=EL('div','listhead'); h.appendChild(EL('h3',null,'Histórico de atendimentos'));
+  h.appendChild(Object.assign(EL('span','muted'),{textContent:list.length+' no período',style:'font-size:13px'})); p.appendChild(h);
+  p.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:-4px;font-size:12.5px',textContent:'Filtre por data lá em cima pra ver por dia, semana ou período.'}));
+  if(!list.length){p.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:8px',textContent:'Nenhum atendimento no período selecionado.'}));return p;}
+  const byDay={}; list.forEach(a=>{const d=(a.realizado_em||a.inicio||'').slice(0,10);(byDay[d]=byDay[d]||[]).push(a);});
+  Object.keys(byDay).sort((a,b)=>b.localeCompare(a)).forEach(day=>{
+    const items=byDay[day];
+    const totalView=items.reduce((s,a)=>s+((opts.clean?valorMostra(a):valorAt(a))||0),0);
+    const dh=EL('div'); dh.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:13px;padding-bottom:5px;border-bottom:1px solid var(--line2)';
+    dh.appendChild(Object.assign(EL('b'),{textContent:brDate(day,{weekday:'short',day:'2-digit',month:'2-digit'}),style:'text-transform:capitalize;font-size:13.5px'}));
+    dh.appendChild(Object.assign(EL('span','muted'),{textContent:items.length+' atend. · '+fmt(totalView),style:'font-size:12.5px'}));
+    p.appendChild(dh);
+    items.forEach(a=>{
+      const sv=servById(a.servico_id),pr=proById(a.profissional_id);
+      const cliente=(S.leads.find(l=>l.id===a.lead_id)||{}).nome||a.cliente_nome||'Cliente';
+      const row=EL('div','rowline'); const left=EL('div'); left.style.minWidth='0';
+      left.appendChild(Object.assign(EL('div'),{textContent:(a.inicio?hhmm(new Date(a.inicio))+' · ':'')+cliente,style:'font-weight:600;font-size:13.5px'}));
+      left.appendChild(Object.assign(EL('div','muted'),{textContent:(sv.nome||'serviço')+((!proId)?(' · '+(pr.nome||'')):''),style:'font-size:12px'}));
+      row.appendChild(left);
+      const right=EL('div'); right.style.cssText='text-align:right;white-space:nowrap;margin-left:10px';
+      if(opts.clean){ right.appendChild(Object.assign(EL('b','serif'),{textContent:fmt(valorMostra(a))})); }
+      else { right.appendChild(Object.assign(EL('b','serif'),{textContent:fmt(valorAt(a))}));
+        if(opts.pct>0) right.appendChild(Object.assign(EL('div','muted'),{textContent:'líq. '+fmt(valorAt(a)*(1-opts.pct/100)),style:'font-size:11px'})); }
+      row.appendChild(right);
+      p.appendChild(row);
+    });
+  });
+  return p;
 }
 function rangeBar(){
   const bar=EL('div','rangebar');
