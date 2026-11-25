@@ -116,6 +116,16 @@ button{cursor:pointer}
 .srow input{padding:6px 8px;border:1px solid var(--line2);border-radius:8px;background:var(--bg);color:var(--ink);width:100%}
 .soon{text-align:center;color:var(--muted);padding:50px 18px}
 .soon .big{font-family:var(--disp);font-size:26px;color:var(--ink);margin-bottom:6px}
+.agwrap{margin-top:14px;display:flex;overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.agcol{min-width:148px;flex:1;border-right:1px solid var(--line)}
+.agcol.agtime{flex:0 0 48px;min-width:48px}
+.agcol:last-child{border-right:none}
+.agh{background:var(--surface2);border-bottom:1px solid var(--line);padding:8px 6px;text-align:center;font-weight:600;font-size:12.5px;height:38px;white-space:nowrap;overflow:hidden}
+.agbody{position:relative}
+.aghour{height:54px;border-bottom:1px dashed var(--line)}
+.agtime .aglabel{height:54px;font-size:10.5px;color:var(--muted);text-align:right;padding:2px 5px;box-sizing:border-box}
+.agblk{position:absolute;left:3px;right:3px;border-radius:8px;padding:3px 7px;font-size:11.5px;line-height:1.25;overflow:hidden;cursor:pointer;color:var(--ink);border-left:3px solid var(--gold)}
+.agblk b{display:block;font-size:12px;font-weight:600}
 /* ====== MODAL ====== */
 .ov{position:fixed;inset:0;background:rgba(40,28,20,.5);display:grid;place-items:center;padding:16px;z-index:50}
 .modal{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);width:100%;max-width:460px;max-height:92vh;overflow:auto;padding:22px}
@@ -189,7 +199,7 @@ const ORIGENS=["Instagram (anúncio)","Instagram (orgânico)","Indicação","Wha
 const ETAPAS=[{k:'lead',l:'Lead'},{k:'conversa',l:'Em conversa'},{k:'followup',l:'Follow-up'},{k:'agendada',l:'Agendada'},{k:'realizou',l:'Realizou'},{k:'naoveio',l:'Não veio'}];
 const monthKey=d=>{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')};
 
-const S={me:null,pros:[],servicos:[],precos:{},leads:[],fin:{},config:{custo_total_mes:0},despesas:[],tab:'funil',month:monthKey(Date.now())};
+const S={me:null,pros:[],servicos:[],precos:{},leads:[],fin:{},config:{custo_total_mes:0},despesas:[],agendamentos:[],agDay:new Date().toISOString().slice(0,10),tab:'funil',month:monthKey(Date.now())};
 
 // ---------- AUTH ----------
 document.getElementById('loginform').addEventListener('submit',async e=>{
@@ -212,7 +222,7 @@ async function boot(){
   await loadAll(); renderShell(); render();
 }
 async function loadAll(){
-  const [pros,serv,prec,leads,fin,cfg,desp]=await Promise.all([
+  const [pros,serv,prec,leads,fin,cfg,desp,ags]=await Promise.all([
     sb.from('profissionais').select('*').order('ordem'),
     sb.from('servicos').select('*').order('nome'),
     sb.from('servicos_preco').select('*'),
@@ -220,6 +230,7 @@ async function loadAll(){
     sb.from('financeiro').select('*'),
     sb.from('studio_config').select('*').eq('id',1).maybeSingle(),
     sb.from('despesas').select('*'),
+    sb.from('agendamentos').select('*'),
   ]);
   S.pros=pros.data||[]; S.servicos=serv.data||[];
   S.precos={}; (prec.data||[]).forEach(p=>S.precos[p.servico_id]=p);
@@ -227,6 +238,7 @@ async function loadAll(){
   S.fin={}; (fin.data||[]).forEach(f=>S.fin[f.lead_id]=f);
   S.config=cfg.data||{custo_total_mes:0};
   S.despesas=desp.data||[];
+  S.agendamentos=ags.data||[];
 }
 const proById=id=>S.pros.find(p=>p.id===id)||{};
 const servById=id=>S.servicos.find(s=>s.id===id)||{};
@@ -265,7 +277,7 @@ function render(){
   if(S.tab==='funil') v.appendChild(viewFunil());
   else if(S.tab==='servicos') v.appendChild(viewServicos());
   else if(S.tab==='painel') v.appendChild(viewPainel());
-  else if(S.tab==='agenda') v.appendChild(soon('Agenda','O calendário com horários, duração e cores por profissional — agendando uma pra outra — entra na próxima etapa.'));
+  else if(S.tab==='agenda') v.appendChild(viewAgenda());
   else if(S.tab==='equipe') v.appendChild(viewEquipe());
 }
 function pageHead(title,sub){
@@ -329,7 +341,7 @@ function cardLead(l){
   const e=l.etapa||'lead';
   if(['lead','conversa','followup'].includes(e)){
     const qa=EL('div','qa');
-    const ag=EL('button','qb go','📅 Agendar');ag.onclick=ev=>{ev.stopPropagation();move(l,'agendada')};qa.appendChild(ag);
+    const ag=EL('button','qb go','📅 Agendar');ag.onclick=ev=>{ev.stopPropagation();openAgendamento(null,{servico_id:l.servico_id,cliente_nome:l.nome,cliente_telefone:l.telefone,lead_id:l.id})};qa.appendChild(ag);
     if(e!=='followup'){const fu=EL('button','qb','Follow-up');fu.onclick=ev=>{ev.stopPropagation();move(l,'followup')};qa.appendChild(fu);}
     c.appendChild(qa);
   } else if(e==='agendada'){
@@ -610,6 +622,96 @@ function aniversariantesPanel(){
     if(l.telefone){const a=EL('a','lk','Parabenizar');a.href='https://wa.me/55'+l.telefone.replace(/\D/g,'').replace(/^55/,'');a.target='_blank';a.rel='noopener';row.appendChild(a);}
     p.appendChild(row);});
   return p;
+}
+// ---------- EQUIPE (admin) ----------
+// ---------- AGENDA ----------
+const AG0=8, AG1=20, HPX=54;
+const hhmm=dt=>String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
+const addDays=(d,n)=>{const x=new Date(d+'T00:00:00');x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+function viewAgenda(){
+  const w=EL('div'); w.appendChild(pageHead('Agenda'));
+  const bar=EL('div','row'); bar.style.cssText='gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center';
+  const prev=EL('button','btn ghost sm','‹');prev.onclick=()=>{S.agDay=addDays(S.agDay,-1);render()};
+  const next=EL('button','btn ghost sm','›');next.onclick=()=>{S.agDay=addDays(S.agDay,1);render()};
+  const hoje=EL('button','btn ghost sm','Hoje');hoje.onclick=()=>{S.agDay=new Date().toISOString().slice(0,10);render()};
+  const lab=EL('b','serif',new Date(S.agDay+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'}));
+  lab.style.cssText='font-size:17px;text-transform:capitalize;min-width:180px;text-align:center';
+  const add=EL('button','btn','+ Agendar');add.style.marginLeft='auto';add.onclick=()=>openAgendamento(null,{});
+  [prev,lab,next,hoje,add].forEach(e=>bar.appendChild(e)); w.appendChild(bar);
+  const pros=S.pros.filter(p=>p.presta_servico!==false);
+  if(!pros.length){w.appendChild(Object.assign(EL('div','muted'),{style:'margin-top:14px',textContent:'Cadastre profissionais na aba Equipe primeiro.'}));return w;}
+  const dayAgs=S.agendamentos.filter(a=>a.inicio && a.inicio.slice(0,10)===S.agDay && a.status!=='cancelado');
+  const wrap=EL('div','agwrap');
+  const tc=EL('div','agcol agtime'); tc.appendChild(EL('div','agh'));
+  const tb=EL('div','agbody'); for(let h=AG0;h<AG1;h++)tb.appendChild(Object.assign(EL('div','aglabel'),{textContent:String(h).padStart(2,'0')+'h'})); tc.appendChild(tb); wrap.appendChild(tc);
+  pros.forEach(p=>{
+    const col=EL('div','agcol');
+    const hh=EL('div','agh'); const dot=EL('span','dot');dot.style.cssText='background:'+(p.cor||'#A8823A')+';display:inline-block;margin-right:6px';hh.appendChild(dot);hh.appendChild(document.createTextNode(p.nome));col.appendChild(hh);
+    const body=EL('div','agbody'); body.style.height=((AG1-AG0)*HPX)+'px';
+    for(let h=AG0;h<AG1;h++)body.appendChild(EL('div','aghour'));
+    body.onclick=ev=>{if(ev.target!==body)return;const r=body.getBoundingClientRect();const mins=Math.max(0,Math.round(((ev.clientY-r.top)/HPX)*60/15)*15);openAgendamento(null,{profissional_id:p.id,hora:String(AG0+Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0')})};
+    dayAgs.filter(a=>a.profissional_id===p.id).forEach(a=>{
+      const st=new Date(a.inicio), ft=a.fim?new Date(a.fim):new Date(st.getTime()+1800000);
+      const blk=EL('div','agblk');
+      blk.style.top=(((st.getHours()+st.getMinutes()/60)-AG0)*HPX)+'px';
+      blk.style.height=Math.max(22,((ft-st)/3600000)*HPX)+'px';
+      blk.style.background='color-mix(in srgb,'+(p.cor||'#A8823A')+' 15%, var(--surface))';
+      blk.style.borderLeftColor=p.cor||'#A8823A';
+      blk.appendChild(Object.assign(EL('b'),{textContent:hhmm(st)+' '+(a.cliente_nome||'Cliente')}));
+      blk.appendChild(document.createTextNode(servById(a.servico_id).nome||''));
+      blk.onclick=ev=>{ev.stopPropagation();openAgendamento(a,{})};
+      body.appendChild(blk);
+    });
+    col.appendChild(body); wrap.appendChild(col);
+  });
+  w.appendChild(wrap);
+  w.appendChild(Object.assign(EL('p','hint'),{style:'margin-top:8px',textContent:'Toque num horário vazio pra agendar, ou use + Agendar. O sistema avisa se cair em cima de outra cliente.'}));
+  return w;
+}
+function openAgendamento(ag,prefill){
+  prefill=prefill||{}; const isEdit=!!ag;
+  const m=EL('div','modal'); m.appendChild(EL('h3',null,isEdit?'Agendamento':'Novo agendamento'));
+  const nome=inp('text', ag?ag.cliente_nome:(prefill.cliente_nome||''),'Nome da cliente');
+  const tel=inp('text', ag?ag.cliente_telefone:(prefill.cliente_telefone||''),'WhatsApp');
+  let servOpts=S.servicos.map(s=>[s.id,s.nome+' · '+(proById(s.profissional_id).nome||'')]);
+  const serv=sel(servOpts, ag?ag.servico_id:(prefill.servico_id||''),'— serviço —');
+  const data=inp('date', ag?ag.inicio.slice(0,10):S.agDay);
+  const hora=inp('time', ag?hhmm(new Date(ag.inicio)):(prefill.hora||'09:00'));
+  const obs=document.createElement('textarea');obs.rows=2;obs.value=ag?(ag.obs||''):'';obs.placeholder='Observações';
+  const info=EL('div','muted');info.style.cssText='font-size:13px;margin:-2px 0 6px';
+  const warn=EL('div');warn.style.cssText='font-size:13px;margin:4px 0';
+  let confirmed=false;
+  const resetConf=()=>{confirmed=false;save.textContent='Salvar';warn.textContent=''};
+  const refresh=()=>{const s=servById(serv.value),p=proById(s.profissional_id);info.innerHTML=s.id?('Profissional: <b>'+(p.nome||'?')+'</b> · duração '+(s.tempo_min||30)+' min'):''};
+  serv.onchange=()=>{refresh();resetConf()}; data.oninput=resetConf; hora.oninput=resetConf;
+  m.appendChild(field('Cliente',nome)); m.appendChild(field('WhatsApp',tel)); m.appendChild(field('Serviço',serv)); m.appendChild(info); refresh();
+  const two=EL('div','two'); two.appendChild(field('Data',data)); two.appendChild(field('Hora',hora)); m.appendChild(two);
+  m.appendChild(field('Observações',obs)); m.appendChild(warn);
+  const act=EL('div','mactions');
+  if(isEdit){const del=EL('button','btn ghost sm','Excluir');del.style.marginRight='auto';del.onclick=async()=>{await sb.from('agendamentos').delete().eq('id',ag.id);ov.remove();await loadAll();render()};act.appendChild(del);}
+  const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
+  const save=EL('button','btn','Salvar');
+  save.onclick=async()=>{
+    const s=servById(serv.value); if(!s.id){warn.textContent='Escolha um serviço.';warn.style.color='var(--alert)';return;}
+    const proId=s.profissional_id;
+    const inicio=new Date(data.value+'T'+hora.value+':00');
+    const fim=new Date(inicio.getTime()+(s.tempo_min||30)*60000);
+    const conf=S.agendamentos.find(a=>a.profissional_id===proId && (!ag||a.id!==ag.id) && a.status!=='cancelado' && a.inicio && (new Date(a.inicio)<fim) && (new Date(a.fim||a.inicio)>inicio));
+    if(conf && !confirmed){
+      const p=proById(proId);
+      warn.innerHTML='⚠️ <b>'+(p.nome||'')+'</b> já tem <b>'+(conf.cliente_nome||'uma cliente')+'</b> nesse horário ('+hhmm(new Date(conf.inicio))+'). Agendar mesmo assim?';
+      warn.style.color='var(--warn)'; confirmed=true; save.textContent='Agendar mesmo assim'; return;
+    }
+    save.textContent='Salvando…';
+    const row={cliente_nome:nome.value.trim(),cliente_telefone:tel.value.trim()||null,servico_id:serv.value,profissional_id:proId,inicio:inicio.toISOString(),fim:fim.toISOString(),obs:obs.value.trim()||null,status:'marcado'};
+    if(prefill.lead_id) row.lead_id=prefill.lead_id;
+    if(isEdit) await sb.from('agendamentos').update(row).eq('id',ag.id);
+    else await sb.from('agendamentos').insert(row);
+    if(prefill.lead_id) await sb.from('leads').update({etapa:'agendada',atualizado_em:new Date().toISOString()}).eq('id',prefill.lead_id);
+    ov.remove(); await loadAll(); render();
+  };
+  act.appendChild(cancel);act.appendChild(save);m.appendChild(act);
+  const ov=overlay(m); nome.focus();
 }
 // ---------- EQUIPE (admin) ----------
 function viewEquipe(){
