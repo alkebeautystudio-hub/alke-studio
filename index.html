@@ -791,9 +791,9 @@ function caixa(){
 }
 function caixaPanel(){
   const cx=caixa(); const p=EL('div','panel caixa'); p.appendChild(EL('h3',null,'Caixa do Studio'));
-  p.appendChild(EL('p','muted','Entra 30% das não-sócias, sai o custo fixo + gastos. O saldo divide 50/50 entre as sócias.'));
+  p.appendChild(EL('p','muted','Entra a porcentagem repassada pelas não-sócias, sai o custo fixo + gastos. O saldo divide 50/50 entre as sócias.'));
   const g=EL('div','grid');
-  g.appendChild(tile('Entradas (30%)',fmt(cx.entradas)));
+  g.appendChild(tile('Entradas (repasse)',fmt(cx.entradas)));
   g.appendChild(tile('Custo + gastos',fmt(cx.fixo+cx.gastos)));
   g.appendChild(tile('Saldo',fmt(cx.saldo),cx.saldo>=0?'pos':'neg'));
   g.appendChild(tile('Pra cada sócia',fmt(cx.saldo/2),cx.saldo>=0?'pos':'neg'));
