@@ -909,7 +909,7 @@ function openAgendamento(ag,prefill){
   m.appendChild(field('Desconto (R$), se teve',desc));
   m.appendChild(field('Observações',obs)); m.appendChild(warn);
   const act=EL('div','mactions');
-  if(isEdit){const del=EL('button','btn ghost sm','Excluir');del.style.marginRight='auto';del.onclick=async()=>{const lid=ag.lead_id;await sb.from('agendamentos').delete().eq('id',ag.id);ov.remove();await loadAll();if(lid){await recomputeEtapa(lid);await loadAll();}render()};act.appendChild(del);}
+  if(isEdit){const del=EL('button','btn ghost sm','Excluir');del.style.marginRight='auto';del.onclick=async()=>{const lid=ag.lead_id;try{if(ag.google_event_id)await sb.functions.invoke('agenda-sync',{body:{action:'delete',event_id:ag.google_event_id}});}catch(_){}await sb.from('agendamentos').delete().eq('id',ag.id);ov.remove();await loadAll();if(lid){await recomputeEtapa(lid);await loadAll();}render()};act.appendChild(del);}
   const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
   const save=EL('button','btn','Salvar');
   save.onclick=async()=>{
@@ -936,8 +936,20 @@ function openAgendamento(ag,prefill){
       else{const {data:ins}=await sb.from('leads').insert({nome:nome.value.trim()||'Cliente',telefone:tel.value.trim()||null,etapa:'agendada',criado_em:new Date().toISOString(),atualizado_em:new Date().toISOString()}).select().single();leadId=ins?.id;}
     }
     if(leadId) row.lead_id=leadId;
-    if(isEdit) await sb.from('agendamentos').update(row).eq('id',ag.id);
-    else await sb.from('agendamentos').insert(row);
+    let agId=isEdit?ag.id:null, gid=isEdit?ag.google_event_id:null;
+    if(isEdit){ await sb.from('agendamentos').update(row).eq('id',ag.id); }
+    else { const {data:ins}=await sb.from('agendamentos').insert(row).select().single(); agId=ins&&ins.id; }
+    // reflete na agenda do Google da Alke + convida a profissional por e-mail (não trava se falhar)
+    try{
+      const pro=proById(proId)||{};
+      const gr=await sb.functions.invoke('agenda-sync',{body:{
+        titulo:(s.nome||'Atendimento')+' · '+(nome.value.trim()||'Cliente'),
+        descricao:'Cliente: '+(nome.value.trim()||'')+(tel.value.trim()?' ('+tel.value.trim()+')':'')+'\nProfissional: '+(pro.nome||''),
+        inicio:inicio.toISOString(), fim:fim.toISOString(),
+        convidado_email:pro.email||undefined, event_id:gid||undefined}});
+      const newId=gr&&gr.data&&gr.data.id;
+      if(newId&&newId!==gid&&agId){ await sb.from('agendamentos').update({google_event_id:newId}).eq('id',agId); }
+    }catch(_){}
     ov.remove(); await loadAll();
     if(leadId){ await recomputeEtapa(leadId); await loadAll(); }
     render();
