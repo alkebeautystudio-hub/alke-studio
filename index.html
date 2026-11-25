@@ -824,7 +824,7 @@ function despesasPanel(){
   }
   // lançamentos
   if(mine.length){const sep=EL('div','muted');sep.style.cssText='margin-top:12px;font-size:12px';sep.textContent='Lançamentos';p.appendChild(sep);
-    mine.forEach(d=>{const row=EL('div','rowline');row.appendChild(EL('span',null,(d.descricao||'—')+' · '+proById(d.profissional_id).nome));
+    mine.forEach(d=>{const row=EL('div','rowline');row.appendChild(EL('span',null,(d.descricao||'—')+' · pago por '+(proById(d.profissional_id).nome||'—')));
       const rt=EL('div','muted');rt.textContent=fmt(d.valor);
       if(isAdmin()||d.profissional_id===S.me.id){const x=EL('button','btn ghost sm','×');x.style.marginLeft='10px';x.onclick=async()=>{await sb.from('despesas').delete().eq('id',d.id);await loadAll();render()};rt.appendChild(x)}
       row.appendChild(rt);p.appendChild(row)});}
@@ -841,10 +841,15 @@ function despesasPanel(){
 function openDespesa(){
   const m=EL('div','modal');m.appendChild(EL('h3',null,'Lançar gasto'));
   const desc=inp('text','','Ex: material, aluguel, luz');const val=inp('number',0);
-  m.appendChild(field('Descrição',desc));m.appendChild(field('Valor',val));
+  // quem pagou: admin escolhe qualquer uma; sócia fica nela mesma (regra do banco)
+  const proOpts=S.pros.filter(p=>p.socia||p.admin).map(p=>[p.id,p.nome]);
+  const quem=sel(proOpts, S.me.id, '— quem pagou —'); if(!isAdmin())quem.disabled=true;
+  m.appendChild(field('O que foi (descrição)',desc));
+  m.appendChild(field('Quem pagou',quem));
+  m.appendChild(field('Valor (R$)',val));
   const act=EL('div','mactions');const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
   const save=EL('button','btn','Salvar');
-  save.onclick=async()=>{await sb.from('despesas').insert({profissional_id:S.me.id,descricao:desc.value.trim(),valor:Number(val.value)||0,mes:new Date().toISOString().slice(0,7)+'-01'});ov.remove();await loadAll();render()};
+  save.onclick=async()=>{await sb.from('despesas').insert({profissional_id:(isAdmin()?(quem.value||S.me.id):S.me.id),descricao:desc.value.trim(),valor:Number(val.value)||0,mes:new Date().toISOString().slice(0,7)+'-01'});ov.remove();await loadAll();render()};
   act.appendChild(cancel);act.appendChild(save);m.appendChild(act);const ov=overlay(m);desc.focus();
 }
 
