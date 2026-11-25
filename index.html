@@ -16,7 +16,7 @@
   --disp:'Outfit','Inter',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif; --brand:'Cormorant Garamond',Georgia,serif;
   --shadow:0 1px 2px rgba(51,44,35,.05),0 10px 30px rgba(51,44,35,.07);
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+@media (prefers-color-scheme:dark){:root[data-theme="__autodark_off__"]{
   --bg:#1E1913; --bg2:#19140F; --surface:#272019; --surface2:#2F271E;
   --ink:#F1E7D6; --muted:#B0A185; --gold:#C8A25A; --gold2:#D9B874; --goldsoft:#3A2F1E;
   --line:#3A3122; --line2:#473C29; --win:#7CB07A; --warn:#D9A84E; --alert:#D98B84;
@@ -679,15 +679,30 @@ function agGridTime(){
   const tc=EL('div','agcol agtime'); tc.appendChild(EL('div','agh'));
   const tb=EL('div','agbody'); for(let h=AG0;h<AG1;h++)tb.appendChild(Object.assign(EL('div','aglabel'),{textContent:String(h).padStart(2,'0')+'h'})); tc.appendChild(tb); return tc;
 }
+function layoutCol(evs){
+  evs.forEach(a=>{a._s=new Date(a.inicio).getTime();a._e=a.fim?new Date(a.fim).getTime():a._s+1800000});
+  evs.sort((a,b)=>a._s-b._s||a._e-b._e);
+  let i=0;
+  while(i<evs.length){
+    let cl=[evs[i]],maxEnd=evs[i]._e,j=i+1;
+    while(j<evs.length&&evs[j]._s<maxEnd){cl.push(evs[j]);maxEnd=Math.max(maxEnd,evs[j]._e);j++}
+    const lanes=[];
+    cl.forEach(e=>{let k=0;while(k<lanes.length&&lanes[k]>e._s)k++;e._lane=k;lanes[k]=e._e});
+    cl.forEach(e=>e._total=lanes.length); i=j;
+  }
+  return evs;
+}
 function agBlock(a,narrow){
   const p=proById(a.profissional_id);const st=new Date(a.inicio),ft=a.fim?new Date(a.fim):new Date(st.getTime()+1800000);
   const blk=EL('div','agblk');
   blk.style.top=(((st.getHours()+st.getMinutes()/60)-AG0)*HPX)+'px';
-  blk.style.height=Math.max(narrow?16:22,((ft-st)/3600000)*HPX)+'px';
-  blk.style.background='color-mix(in srgb,'+(p.cor||'#A8823A')+' 15%, var(--surface))';
-  blk.style.borderLeftColor=p.cor||'#A8823A'; if(narrow)blk.style.fontSize='10.5px';
+  blk.style.height=Math.max(narrow?18:22,((ft-st)/3600000)*HPX)+'px';
+  const total=a._total||1,lane=a._lane||0;
+  blk.style.left='calc('+(lane*100/total)+'% + 2px)'; blk.style.width='calc('+(100/total)+'% - 4px)'; blk.style.right='auto';
+  blk.style.background='color-mix(in srgb,'+(p.cor||'#A8823A')+' 16%, var(--surface))';
+  blk.style.borderLeftColor=p.cor||'#A8823A'; if(narrow)blk.style.fontSize='10px';
   blk.appendChild(Object.assign(EL('b'),{textContent:hhmm(st)+' '+(a.cliente_nome||'Cliente')}));
-  if(!narrow)blk.appendChild(document.createTextNode(servById(a.servico_id).nome||''));
+  blk.appendChild(Object.assign(EL('div'),{textContent:p.nome||'',style:'font-size:9.5px;opacity:.72;white-space:nowrap;overflow:hidden'}));
   return blk;
 }
 function agDay(pros){
@@ -699,7 +714,7 @@ function agDay(pros){
     const body=EL('div','agbody'); body.style.height=((AG1-AG0)*HPX)+'px';
     for(let h=AG0;h<AG1;h++)body.appendChild(EL('div','aghour'));
     body.onclick=ev=>{if(ev.target!==body)return;const r=body.getBoundingClientRect();const mins=Math.max(0,Math.round(((ev.clientY-r.top)/HPX)*60/15)*15);openAgendamento(null,{profissional_id:p.id,hora:String(AG0+Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0')})};
-    dayAgs.filter(a=>a.profissional_id===p.id).forEach(a=>{const blk=agBlock(a,false);blk.onclick=ev=>{ev.stopPropagation();openAgendamento(a,{})};body.appendChild(blk);});
+    layoutCol(dayAgs.filter(a=>a.profissional_id===p.id)).forEach(a=>{const blk=agBlock(a,false);blk.onclick=ev=>{ev.stopPropagation();openAgendamento(a,{})};body.appendChild(blk);});
     col.appendChild(body); wrap.appendChild(col);
   });
   return wrap;
@@ -716,7 +731,7 @@ function agWeek(pros){
     const body=EL('div','agbody'); body.style.height=((AG1-AG0)*HPX)+'px'; if(day===today)body.style.background='color-mix(in srgb,var(--gold) 6%,transparent)';
     for(let h=AG0;h<AG1;h++)body.appendChild(EL('div','aghour'));
     body.onclick=ev=>{if(ev.target!==body)return;const r=body.getBoundingClientRect();const mins=Math.max(0,Math.round(((ev.clientY-r.top)/HPX)*60/15)*15);S.agDay=day;openAgendamento(null,{hora:String(AG0+Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0')})};
-    S.agendamentos.filter(a=>a.inicio&&a.inicio.slice(0,10)===day&&a.status!=='cancelado').forEach(a=>{const blk=agBlock(a,true);blk.onclick=ev=>{ev.stopPropagation();S.agDay=day;openAgendamento(a,{})};body.appendChild(blk);});
+    layoutCol(S.agendamentos.filter(a=>a.inicio&&a.inicio.slice(0,10)===day&&a.status!=='cancelado')).forEach(a=>{const blk=agBlock(a,true);blk.onclick=ev=>{ev.stopPropagation();S.agDay=day;openAgendamento(a,{})};body.appendChild(blk);});
     col.appendChild(body); wrap.appendChild(col);
   }
   return wrap;
