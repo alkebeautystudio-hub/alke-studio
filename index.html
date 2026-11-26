@@ -1724,8 +1724,10 @@ async function threadView(telefone, opts){
     catch(e){ alert('Não consegui acessar o microfone. Permita o acesso.'); } };
   const send=ibtn(ICON.send,'iconbtn primary');send.style.display='none';
   const toggleSend=()=>{ const has=ta.value.trim().length>0; send.style.display=has?'':'none'; micBtn.style.display=has?'none':''; };
-  const doSend=async()=>{ const txt=ta.value.trim(); if(!txt)return; send.disabled=true; const r=await fzapCall('send',{phone:tel,body:txt,enviado_por:prov()}); send.disabled=false; if(r&&r.ok){ta.value='';toggleSend();await loadMsgs(); if(opts.onSent)opts.onSent();} else {alert('Não consegui enviar. O WhatsApp pode estar desconectado — conecte na aba Conversas.');} };
-  send.onclick=doSend; ta.oninput=toggleSend; ta.onkeydown=ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();doSend();}};
+  let sending=false;
+  const doSend=async()=>{ const txt=ta.value.trim(); if(!txt||sending)return; sending=true;send.disabled=true; const r=await fzapCall('send',{phone:tel,body:txt,enviado_por:prov()}); sending=false;send.disabled=false; if(r&&r.ok){ta.value='';toggleSend();await loadMsgs(); if(opts.onSent)opts.onSent();} else {alert('Não consegui enviar. O WhatsApp pode estar desconectado — conecte na aba Conversas.');} };
+  // Enter NÃO envia — vai pra linha de baixo. Só o botão envia.
+  send.onclick=doSend; ta.oninput=toggleSend;
   foot.style.position='relative';
   foot.appendChild(plus);foot.appendChild(ta);foot.appendChild(camBtn);foot.appendChild(micBtn);foot.appendChild(send);wrap.appendChild(foot);
   return wrap;
