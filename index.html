@@ -1476,32 +1476,19 @@ function viewConversas(){
 }
 async function openConversa(telefone){
   const mobile=window.matchMedia&&window.matchMedia('(max-width:720px)').matches;
-  if(mobile){
-    // painel de tela cheia DIRETO no body (sem overlay/.ov) pra NAO ligar o scroll-lock — rola nativo igual a aba Conversas
-    const panel=EL('div'); panel.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;z-index:60;background:var(--surface);display:flex;flex-direction:column;overflow:hidden';
-    document.body.appendChild(panel);
-    const close=()=>{ panel.remove(); };
-    const el=await threadView(telefone,{onBack:close,alwaysBack:true,closeOverlay:close});
-    el.style.height='100%'; el.style.minHeight='0'; el.style.flex='1 1 0';
-    const head=el.firstChild, foot=el.lastChild;
-    if(head&&head.style){head.style.paddingTop='calc(11px + env(safe-area-inset-top,0px))';}
-    if(foot&&foot.style){foot.style.paddingBottom='calc(10px + env(safe-area-inset-bottom,0px))';}
-    panel.appendChild(el); if(el._toBottom)el._toBottom();
-    bindKeyboard(panel);
-    return;
-  }
-  // PC: pop-up centralizado
-  const m=EL('div','modal big'); m.style.height='min(80vh,640px)'; m.style.display='flex'; m.style.flexDirection='column'; m.style.padding='0'; m.style.overflow='hidden';
+  const m=EL('div','modal big');
+  m.style.height='min(80vh,640px)'; m.style.maxHeight='100%'; m.style.display='flex'; m.style.flexDirection='column'; m.style.padding='0'; m.style.overflow='hidden';
   const ov=overlay(m);
   const el=await threadView(telefone,{onBack:()=>ov.remove(),alwaysBack:true,closeOverlay:()=>ov.remove()});
   el.style.height='100%'; el.style.minHeight='0'; el.style.flex='1 1 0';
   m.appendChild(el); if(el._toBottom)el._toBottom();
+  if(mobile) bindKeyboard(ov);  // overlay acompanha o teclado => pop-up centraliza na area visível acima do teclado
 }
-// no celular, acompanha o teclado (VisualViewport) pra o campo de digitar ficar sempre visível acima do teclado
+// no celular, redimensiona o overlay pro espaço visível (VisualViewport), pro pop-up ficar acima do teclado
 function bindKeyboard(node){
   if(!window.visualViewport) return;
   const vv=window.visualViewport;
-  const fit=()=>{ node.style.height=vv.height+'px'; node.style.bottom='auto'; node.style.top=(vv.offsetTop||0)+'px'; };
+  const fit=()=>{ node.style.height=vv.height+'px'; node.style.top=(vv.offsetTop||0)+'px'; node.style.bottom='auto'; };
   vv.addEventListener('resize',fit); vv.addEventListener('scroll',fit); fit();
   try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(node)){vv.removeEventListener('resize',fit);vv.removeEventListener('scroll',fit);mo.disconnect();} }); mo.observe(document.body,{childList:true}); }catch(_){}
 }
