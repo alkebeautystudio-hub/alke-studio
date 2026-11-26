@@ -1660,13 +1660,21 @@ async function threadView(telefone, opts){
   const loadMsgs=async()=>{ const {data}=await sb.from('mensagens').select('*').eq('telefone',tel).order('criado_em',{ascending:true});
     body.innerHTML='';
     let io=null; try{ io=new IntersectionObserver((ents)=>{ents.forEach(e=>{if(e.isIntersecting){io.unobserve(e.target);e.target._load&&e.target._load();}});},{root:body,rootMargin:'300px'}); }catch(_){}
-    (data||[]).forEach(mm=>{ const b=EL('div');const mine=mm.direcao==='out';
-      b.style.cssText='max-width:76%;padding:8px 11px;border-radius:12px;font-size:14px;white-space:pre-wrap;word-break:break-word;'+(mine?'align-self:flex-end;background:color-mix(in srgb,var(--gold) 22%,var(--surface))':'align-self:flex-start;background:var(--surface);border:1px solid var(--line)');
-      if(MIDIAS.includes(mm.tipo)){ b.appendChild(buildMedia(mm,io)); if(mm.texto&&mm.texto[0]!=='['&&mm.tipo!=='document'&&mm.tipo!=='doc'){ b.appendChild(Object.assign(EL('div'),{textContent:mm.texto,style:'margin-top:4px'})); } }
+    (data||[]).filter(mm=>!mm.oculta).forEach(mm=>{ const b=EL('div');const mine=mm.direcao==='out';const apagada=mm.apagada||mm.tipo==='deleted';
+      b.style.cssText='position:relative;max-width:76%;padding:8px 11px;border-radius:12px;font-size:14px;white-space:pre-wrap;word-break:break-word;'+(mine?'align-self:flex-end;background:color-mix(in srgb,var(--gold) 22%,var(--surface))':'align-self:flex-start;background:var(--surface);border:1px solid var(--line)');
+      if(apagada){ const di=EL('div');di.textContent='🚫 Mensagem apagada';di.style.cssText='font-style:italic;color:var(--muted)';b.appendChild(di); }
+      else if(MIDIAS.includes(mm.tipo)){ b.appendChild(buildMedia(mm,io)); if(mm.texto&&mm.texto[0]!=='['&&mm.tipo!=='document'&&mm.tipo!=='doc'){ b.appendChild(Object.assign(EL('div'),{textContent:mm.texto,style:'margin-top:4px'})); } }
       else { const ml=midiaLabel(mm.tipo,mm.texto); if(ml){const mi=EL('div');mi.textContent=ml;mi.style.cssText='font-style:italic;color:var(--muted)';b.appendChild(mi);} else b.appendChild(document.createTextNode(mm.texto||'')); }
       const tm=EL('div');tm.style.cssText='font-size:10px;color:var(--muted);margin-top:2px;text-align:right';
       tm.textContent=(mine&&mm.enviado_por?mm.enviado_por+' · ':'')+(mm.criado_em?hhmm(new Date(mm.criado_em)):'');
       b.appendChild(tm); body.appendChild(b);
+      if(!apagada){ // menu de ações: segurar (mobile), botão direito (pc), ou tocar no ⋯
+        let pt=null; const op=(e)=>{if(e)e.preventDefault();menuFor(mm);};
+        b.addEventListener('contextmenu',op);
+        b.addEventListener('touchstart',()=>{pt=setTimeout(()=>{try{navigator.vibrate&&navigator.vibrate(12);}catch(_){}menuFor(mm);},480);},{passive:true});
+        b.addEventListener('touchend',()=>{if(pt)clearTimeout(pt);}); b.addEventListener('touchmove',()=>{if(pt)clearTimeout(pt);});
+        const dots=EL('span');dots.textContent='⋯';dots.style.cssText='position:absolute;top:1px;'+(mine?'left:-20px':'right:-20px')+';color:var(--muted);cursor:pointer;font-size:16px;opacity:.6;padding:2px 5px';dots.onclick=(e)=>{e.stopPropagation();menuFor(mm);};b.appendChild(dots);
+      }
     });
     if(!(data||[]).length)body.appendChild(Object.assign(EL('div','muted'),{textContent:'Sem mensagens ainda.',style:'text-align:center;padding:10px;font-size:13px;margin:auto'}));
     requestAnimationFrame(()=>{body.scrollTop=body.scrollHeight;});
@@ -1683,6 +1691,52 @@ async function threadView(telefone, opts){
       }).subscribe();
     try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(wrap)){ try{sb.removeChannel(chan);}catch(_){} mo.disconnect(); } }); mo.observe(document.body,{childList:true,subtree:true}); }catch(_){}
   }catch(_){}
+  let replyTo=null, replyBar=null;
+  function renderReplyBar(){ if(!replyBar)return; if(!replyTo){replyBar.style.display='none';replyBar.innerHTML='';return;} replyBar.style.display='flex'; replyBar.innerHTML='';
+    const qq=EL('div');qq.style.cssText='flex:1;min-width:0;border-left:3px solid var(--gold);padding:3px 9px';
+    const who=EL('div');who.textContent=replyTo.direcao==='out'?'Você':nomeDaConversa(c);who.style.cssText='font-weight:700;color:var(--gold);font-size:12px';
+    const tx=EL('div');tx.textContent=(replyTo.texto||'['+(replyTo.tipo||'mídia')+']').slice(0,70);tx.style.cssText='white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;color:var(--muted)';
+    qq.appendChild(who);qq.appendChild(tx);
+    const x=ibtn('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>');x.onclick=()=>{replyTo=null;renderReplyBar();};
+    replyBar.appendChild(qq);replyBar.appendChild(x);
+  }
+  function actionSheet(builder){ const sh=EL('div');sh.style.cssText='position:fixed;inset:0;z-index:96;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center;animation:ovin .15s ease';
+    const card=EL('div');card.style.cssText='background:var(--surface);border-radius:18px 18px 0 0;width:100%;max-width:460px;max-height:80vh;overflow-y:auto;padding:8px 0 calc(10px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 40px rgba(0,0,0,.25);animation:modin .22s cubic-bezier(.2,.8,.2,1)';
+    const close=()=>sh.remove(); sh.onclick=(e)=>{if(e.target===sh)close();}; builder(card,close); sh.appendChild(card);document.body.appendChild(sh); return close; }
+  function sheetItem(card,label,fn,danger){ const it=EL('div');it.textContent=label;it.style.cssText='padding:15px 22px;font-size:15px;cursor:pointer;color:'+(danger?'var(--alert)':'var(--ink)');it.onmouseenter=()=>it.style.background='var(--surface2)';it.onmouseleave=()=>it.style.background='';it.onclick=fn;card.appendChild(it);return it; }
+  function menuFor(mm){ const mine=mm.direcao==='out'; const isTxt=!MIDIAS.includes(mm.tipo)&&mm.tipo!=='deleted';
+    actionSheet((card,close)=>{
+      sheetItem(card,'↩  Responder',()=>{close();replyTo=mm;renderReplyBar();const t=wrap.querySelector('textarea');if(t)t.focus();});
+      if(isTxt&&mm.texto) sheetItem(card,'⧉  Copiar',()=>{close();try{navigator.clipboard.writeText(mm.texto);}catch(_){}});
+      sheetItem(card,'➦  Encaminhar',()=>{close();forwardPicker(mm);});
+      if(mine&&isTxt&&mm.wa_id) sheetItem(card,'✎  Editar',()=>{close();editMsg(mm);});
+      sheetItem(card,'🗑  Apagar para mim',()=>{close();apagarPraMim(mm);});
+      if(mine&&mm.wa_id) sheetItem(card,'🗑  Apagar para todos',()=>{close();apagarPraTodos(mm);},true);
+      const cc=EL('div');cc.textContent='Cancelar';cc.style.cssText='padding:15px 22px;font-size:15px;text-align:center;color:var(--muted);cursor:pointer;border-top:1px solid var(--line);margin-top:4px';cc.onclick=close;card.appendChild(cc);
+    });
+  }
+  function forwardPicker(mm){ actionSheet((card,close)=>{
+    card.appendChild(Object.assign(EL('div'),{textContent:'Encaminhar para',style:'font-weight:800;font-size:16px;padding:12px 22px 6px'}));
+    const si=document.createElement('input');si.placeholder='Buscar conversa';si.style.cssText='width:calc(100% - 44px);margin:0 22px 8px;padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--bg);color:var(--ink)';card.appendChild(si);
+    const list=EL('div');card.appendChild(list);
+    const draw=()=>{ list.innerHTML=''; const q=si.value.trim().toLowerCase();
+      (S.conversas||[]).filter(cv=>!q||nomeDaConversa(cv).toLowerCase().includes(q)||(cv.telefone||'').includes(q)).slice(0,30).forEach(cv=>{
+        const row=EL('div');row.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 22px;cursor:pointer';row.onmouseenter=()=>row.style.background='var(--surface2)';row.onmouseleave=()=>row.style.background='';
+        row.appendChild(avatarEl(cv,34,false)); row.appendChild(Object.assign(EL('div'),{textContent:nomeDaConversa(cv),style:'font-weight:600'}));
+        row.onclick=async()=>{ close(); const to=(cv.telefone||'').replace(/\D/g,''); const r=await fzapCall('forwardmsg',{phone:tel,toPhone:to,id:mm.wa_id,preview:mm.texto||'['+(mm.tipo||'mídia')+']',tipo:mm.tipo,enviado_por:prov()}); if(!(r&&r.ok))alert('Não consegui encaminhar (WhatsApp precisa estar conectado).'); };
+        list.appendChild(row);
+      });
+    };
+    si.oninput=draw; draw();
+  }); }
+  function editMsg(mm){ const m=EL('div','modal');m.appendChild(EL('h3',null,'Editar mensagem'));
+    const ta2=document.createElement('textarea');ta2.rows=3;ta2.value=mm.texto||'';ta2.style.cssText='width:100%;padding:11px 12px;border:1px solid var(--line2);border-radius:11px;background:var(--bg);color:var(--ink);resize:vertical';m.appendChild(ta2);
+    const act=EL('div','mactions');const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
+    const ok=EL('button','btn','Salvar');ok.onclick=async()=>{const t=ta2.value.trim();if(!t){ov.remove();return;}ok.disabled=true;const r=await fzapCall('editmsg',{phone:tel,id:mm.wa_id,body:t});ov.remove();await loadMsgs();if(!(r&&r.ok))alert('Não consegui editar (WhatsApp precisa estar conectado).');};
+    act.appendChild(cancel);act.appendChild(ok);m.appendChild(act);const ov=overlay(m);setTimeout(()=>ta2.focus(),60);
+  }
+  async function apagarPraMim(mm){ try{await sb.from('mensagens').update({oculta:true}).eq('id',mm.id);}catch(_){} await loadMsgs(); }
+  async function apagarPraTodos(mm){ if(!mm.wa_id){alert('Essa mensagem não pode ser apagada para todos.');return;} const r=await fzapCall('deletemsg',{phone:tel,id:mm.wa_id}); await loadMsgs(); if(!(r&&r.ok))alert('Não consegui apagar no WhatsApp (precisa estar conectado).'); }
   const foot=EL('div','wafoot');
   const prov=()=>(S.me&&S.me.nome)||null;
   const fileToData=(file)=>new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file);});
@@ -1733,11 +1787,14 @@ async function threadView(telefone, opts){
   const send=ibtn(ICON.send,'iconbtn primary');send.style.display='none';
   const toggleSend=()=>{ const has=ta.value.trim().length>0; send.style.display=has?'':'none'; micBtn.style.display=has?'none':''; };
   let sending=false;
-  const doSend=async()=>{ const txt=ta.value.trim(); if(!txt||sending)return; sending=true;send.disabled=true; const r=await fzapCall('send',{phone:tel,body:txt,enviado_por:prov()}); sending=false;send.disabled=false; if(r&&r.ok){ta.value='';toggleSend();await loadMsgs(); if(opts.onSent)opts.onSent();} else {alert('Não consegui enviar. O WhatsApp pode estar desconectado — conecte na aba Conversas.');} };
+  const doSend=async()=>{ const txt=ta.value.trim(); if(!txt||sending)return; sending=true;send.disabled=true; const extra={phone:tel,body:txt,enviado_por:prov()}; if(replyTo&&replyTo.wa_id)extra.stanzaId=replyTo.wa_id; const r=await fzapCall('send',extra); sending=false;send.disabled=false; if(r&&r.ok){ta.value='';replyTo=null;renderReplyBar();toggleSend();await loadMsgs(); if(opts.onSent)opts.onSent();} else {alert('Não consegui enviar. O WhatsApp pode estar desconectado — conecte na aba Conversas.');} };
   // Enter NÃO envia — vai pra linha de baixo. Só o botão envia.
   send.onclick=doSend; ta.oninput=toggleSend;
-  foot.style.position='relative';
-  foot.appendChild(plus);foot.appendChild(ta);foot.appendChild(camBtn);foot.appendChild(micBtn);foot.appendChild(send);wrap.appendChild(foot);
+  foot.style.position='relative';foot.style.flexDirection='column';foot.style.alignItems='stretch';
+  replyBar=EL('div');replyBar.style.cssText='display:none;align-items:center;gap:6px;padding:5px 2px 7px;margin-bottom:5px;border-bottom:1px solid var(--line)';
+  const inputRow=EL('div');inputRow.style.cssText='display:flex;align-items:flex-end;gap:3px';
+  inputRow.appendChild(plus);inputRow.appendChild(ta);inputRow.appendChild(camBtn);inputRow.appendChild(micBtn);inputRow.appendChild(send);
+  foot.appendChild(replyBar);foot.appendChild(inputRow);wrap.appendChild(foot);
   return wrap;
 }
 function viewConversas(){
