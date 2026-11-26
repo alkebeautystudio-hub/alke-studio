@@ -1482,7 +1482,7 @@ async function openConversa(telefone){
   const ov=overlay(m);
   if(mobile) ov.style.padding='0';
   const el=await threadView(telefone,{onBack:()=>ov.remove(),alwaysBack:true,closeOverlay:()=>ov.remove()});
-  el.style.flex='1 1 auto'; el.style.minHeight='0'; el.style.height='auto';
+  el.style.height='100%'; el.style.minHeight='0'; el.style.flex='1 1 0';
   if(mobile){ const head=el.firstChild, foot=el.lastChild;
     if(head&&head.style){head.style.paddingTop='calc(11px + env(safe-area-inset-top,0px))';head.style.position='sticky';head.style.top='0';head.style.background='var(--surface)';head.style.zIndex='2';}
     if(foot&&foot.style){foot.style.paddingBottom='calc(10px + env(safe-area-inset-bottom,0px))';}
