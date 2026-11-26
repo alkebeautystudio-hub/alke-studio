@@ -1415,7 +1415,8 @@ async function threadView(telefone, opts){
       b.style.cssText='max-width:76%;padding:8px 11px;border-radius:12px;font-size:14px;white-space:pre-wrap;word-break:break-word;'+(mine?'align-self:flex-end;background:color-mix(in srgb,var(--gold) 22%,var(--surface))':'align-self:flex-start;background:var(--surface);border:1px solid var(--line)');
       if(MIDIAS.includes(mm.tipo)){ b.appendChild(buildMedia(mm,io)); if(mm.texto&&mm.texto[0]!=='['&&mm.tipo!=='document'&&mm.tipo!=='doc'){ b.appendChild(Object.assign(EL('div'),{textContent:mm.texto,style:'margin-top:4px'})); } }
       else { const ml=midiaLabel(mm.tipo,mm.texto); if(ml){const mi=EL('div');mi.textContent=ml;mi.style.cssText='font-style:italic;color:var(--muted)';b.appendChild(mi);} else b.appendChild(document.createTextNode(mm.texto||'')); }
-      const tm=EL('div');tm.style.cssText='font-size:10px;color:var(--muted);margin-top:2px;text-align:right';tm.textContent=mm.criado_em?hhmm(new Date(mm.criado_em)):'';
+      const tm=EL('div');tm.style.cssText='font-size:10px;color:var(--muted);margin-top:2px;text-align:right';
+      tm.textContent=(mine&&mm.enviado_por?mm.enviado_por+' · ':'')+(mm.criado_em?hhmm(new Date(mm.criado_em)):'');
       b.appendChild(tm); body.appendChild(b);
     });
     if(!(data||[]).length)body.appendChild(Object.assign(EL('div','muted'),{textContent:'Sem mensagens ainda.',style:'text-align:center;padding:10px;font-size:13px;margin:auto'}));
@@ -1425,12 +1426,43 @@ async function threadView(telefone, opts){
   try{ await sb.from('conversas').update({nao_lidas:0}).eq('telefone',telefone); const cc=(S.conversas||[]).find(x=>x.telefone===telefone); if(cc)cc.nao_lidas=0; }catch(_){}
   await loadMsgs();
   const foot=EL('div','wafoot');
-  const ta=document.createElement('textarea');ta.rows=1;ta.placeholder='Escreva uma mensagem…';ta.style.cssText='flex:1;min-width:0;padding:11px 12px;border:1px solid var(--line2);border-radius:11px;background:var(--surface);color:var(--ink);resize:none;max-height:120px';
-  const send=EL('button','btn','Enviar');
-  const doSend=async()=>{ const txt=ta.value.trim(); if(!txt)return; send.disabled=true;send.textContent='…'; const r=await fzapCall('send',{phone:tel,body:txt}); send.disabled=false;send.textContent='Enviar'; if(r&&r.ok){ta.value='';await loadMsgs(); if(opts.onSent)opts.onSent();} else {alert('Não consegui enviar. O WhatsApp pode estar desconectado — conecte na aba Conversas.');} };
-  send.onclick=doSend; ta.onkeydown=ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();doSend();}};
-  foot.appendChild(ta);foot.appendChild(send);wrap.appendChild(foot);
-  setTimeout(()=>ta.focus(),50);
+  const prov=()=>(S.me&&S.me.nome)||null;
+  const fileToData=(file)=>new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file);});
+  const envMidia=async(file,kind,caption)=>{ if(!file)return; const prev=foot.style.opacity; foot.style.opacity='.5';
+    try{ const data=await fileToData(file); const r=await fzapCall('sendmedia',{phone:tel,kind:kind,data:data,fileName:file.name||'',caption:caption||'',enviado_por:prov()});
+      if(r&&r.ok){ await loadMsgs(); if(opts.onSent)opts.onSent(); } else alert('Não consegui enviar o arquivo. Verifique a conexão do WhatsApp.'); }
+    catch(e){ alert('Erro ao preparar o arquivo.'); } finally{ foot.style.opacity=prev; } };
+  // inputs ocultos
+  const inImg=document.createElement('input');inImg.type='file';inImg.accept='image/*';inImg.hidden=true;inImg.onchange=()=>{envMidia(inImg.files[0],'image');inImg.value='';};
+  const inDoc=document.createElement('input');inDoc.type='file';inDoc.hidden=true;inDoc.onchange=()=>{envMidia(inDoc.files[0],'document');inDoc.value='';};
+  const inCam=document.createElement('input');inCam.type='file';inCam.accept='image/*';inCam.capture='environment';inCam.hidden=true;inCam.onchange=()=>{envMidia(inCam.files[0],'image');inCam.value='';};
+  foot.appendChild(inImg);foot.appendChild(inDoc);foot.appendChild(inCam);
+  // botão + (menu anexos)
+  const plus=EL('button','btn ghost sm','＋');plus.title='Anexar';plus.style.cssText='font-size:18px;padding:8px 11px;flex:0 0 auto';
+  plus.onclick=()=>{ const menu=EL('div');menu.style.cssText='position:absolute;bottom:58px;left:10px;background:var(--surface);border:1px solid var(--line2);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;z-index:5';
+    [['📷  Foto',()=>inImg.click()],['📄  Documento',()=>inDoc.click()]].forEach(([t,fn])=>{const b=EL('div');b.textContent=t;b.style.cssText='padding:12px 18px;cursor:pointer;font-size:14px;white-space:nowrap';b.onmouseenter=()=>b.style.background='var(--goldsoft)';b.onmouseleave=()=>b.style.background='';b.onclick=()=>{menu.remove();fn();};menu.appendChild(b);});
+    foot.appendChild(menu); const close=(e)=>{if(!menu.contains(e.target)&&e.target!==plus){menu.remove();document.removeEventListener('click',close);}}; setTimeout(()=>document.addEventListener('click',close),0); };
+  // câmera
+  const camBtn=EL('button','btn ghost sm','📷');camBtn.title='Câmera';camBtn.style.cssText='font-size:16px;padding:8px 10px;flex:0 0 auto';camBtn.onclick=()=>inCam.click();
+  const ta=document.createElement('textarea');ta.rows=1;ta.placeholder='Mensagem';ta.style.cssText='flex:1;min-width:0;padding:11px 12px;border:1px solid var(--line2);border-radius:20px;background:var(--surface);color:var(--ink);resize:none;max-height:120px';
+  // microfone (gravação de áudio)
+  const micBtn=EL('button','btn','🎤');micBtn.title='Gravar áudio';micBtn.style.cssText='flex:0 0 auto';
+  let rec=null,chunks=[];
+  micBtn.onclick=async()=>{
+    if(rec&&rec.state==='recording'){ rec.stop(); return; }
+    if(!navigator.mediaDevices||!window.MediaRecorder){ alert('Seu navegador não permite gravar áudio aqui.'); return; }
+    try{ const stream=await navigator.mediaDevices.getUserMedia({audio:true}); chunks=[]; rec=new MediaRecorder(stream);
+      rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+      rec.onstop=async()=>{ stream.getTracks().forEach(t=>t.stop()); micBtn.textContent='🎤';micBtn.style.background='';
+        const blob=new Blob(chunks,{type:rec.mimeType||'audio/webm'}); const f=new File([blob],'audio.webm',{type:blob.type}); await envMidia(f,'audio'); };
+      rec.start(); micBtn.textContent='⏹'; micBtn.style.background='var(--alert)'; }
+    catch(e){ alert('Não consegui acessar o microfone. Permita o acesso.'); } };
+  const send=EL('button','btn','➤');send.style.cssText='flex:0 0 auto';send.style.display='none';
+  const toggleSend=()=>{ const has=ta.value.trim().length>0; send.style.display=has?'':'none'; micBtn.style.display=has?'none':''; };
+  const doSend=async()=>{ const txt=ta.value.trim(); if(!txt)return; send.disabled=true; const r=await fzapCall('send',{phone:tel,body:txt,enviado_por:prov()}); send.disabled=false; if(r&&r.ok){ta.value='';toggleSend();await loadMsgs(); if(opts.onSent)opts.onSent();} else {alert('Não consegui enviar. O WhatsApp pode estar desconectado — conecte na aba Conversas.');} };
+  send.onclick=doSend; ta.oninput=toggleSend; ta.onkeydown=ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();doSend();}};
+  foot.style.position='relative';
+  foot.appendChild(plus);foot.appendChild(ta);foot.appendChild(camBtn);foot.appendChild(micBtn);foot.appendChild(send);wrap.appendChild(foot);
   return wrap;
 }
 function viewConversas(){
