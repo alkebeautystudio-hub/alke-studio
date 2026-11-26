@@ -499,6 +499,8 @@ function diasSemResposta(l){ const k=(l.telefone||'').replace(/\D/g,''); const c
 function diasDesdeVisita(l){ return l.realizado_em?Math.floor((Date.now()-new Date(l.realizado_em))/864e5):-1; }
 // cliente que fez procedimento, sem retorno marcado: amarelo 10-19 dias, vermelho 20+ dias sem ir ao estúdio
 function atencaoBucket(l){ if(l.etapa==='realizou' && !l.retorno && l.realizado_em){ const d=diasDesdeVisita(l); if(d>=20)return 'vermelho'; if(d>=10)return 'amarelo'; } return null; }
+// marco de dias sem ir ao estúdio: 10,15,20,25,30 (0 = sem alerta)
+function marcoSemIr(l){ if(l.etapa==='realizou' && !l.retorno && l.realizado_em){ const d=diasDesdeVisita(l); if(d>=30)return 30; if(d>=25)return 25; if(d>=20)return 20; if(d>=15)return 15; if(d>=10)return 10; } return 0; }
 function leadAlert(l){
   if(l.etapa==='retorno' && l.retorno){const dd=Math.ceil((new Date(l.retorno+'T00:00:00')-new Date())/864e5); if(dd<=0)return{cls:'al',txt:'retorno atrasado'}; if(dd<=7)return{cls:'wn',txt:'retorno em '+dd+'d'};}
   if(l.etapa==='realizou' && !l.retorno && l.realizado_em){const dias=Math.floor((new Date()-new Date(l.realizado_em))/864e5); if(dias>=20)return{cls:'al',txt:dias+' dias sem ir'}; if(dias>=10)return{cls:'wn',txt:dias+' dias sem ir'};}
@@ -533,29 +535,26 @@ function viewFunil(){
     results.style.display='block';
   };
   sbx.appendChild(si); sbx.appendChild(results); w.appendChild(sbx);
-  // alertas no topo — SÓ aparecem quando têm gente (chegou no estágio)
+  // alertas no topo — SÓ aparecem quando têm gente
   const reativar=S.leads.filter(l=>l.etapa==='followup');  // 1º contato, nunca agendou, sumiu -> reativar
-  const amarelo=S.leads.filter(l=>atencaoBucket(l)==='amarelo');   // já realizou, 10-19 dias sem ir
-  const vermelho=S.leads.filter(l=>atencaoBucket(l)==='vermelho'); // já realizou, 20+ dias sem ir
+  const byMarco={10:[],15:[],20:[],25:[],30:[]};
+  S.leads.forEach(l=>{const m=marcoSemIr(l); if(m)byMarco[m].push(l);});
   const setF=(k)=>()=>{ S.funilFiltro=(S.funilFiltro===k)?null:k; render(); };
-  const cats=[
-    {key:'vermelho',label:'20+ dias sem ir',n:vermelho.length,cls:'red',ic:ICON.alert},
-    {key:'amarelo',label:'10+ dias sem ir',n:amarelo.length,cls:'yel',ic:ICON.clock},
-    {key:'reativar',label:'Follow-up (reativar)',n:reativar.length,cls:'gold',ic:ICON.chat}
-  ].filter(c=>c.n>0);
+  const cats=[];
+  [30,25,20].forEach(m=>{ if(byMarco[m].length) cats.push({key:'m'+m,label:m+' dias sem ir',n:byMarco[m].length,cls:'red',ic:ICON.alert}); });
+  [15,10].forEach(m=>{ if(byMarco[m].length) cats.push({key:'m'+m,label:m+' dias sem ir',n:byMarco[m].length,cls:'yel',ic:ICON.clock}); });
+  if(reativar.length) cats.push({key:'reativar',label:'Follow-up (reativar)',n:reativar.length,cls:'gold',ic:ICON.chat});
   if(cats.length||S.funilFiltro){
     const ach=EL('div','achips');
     cats.forEach(c=>{const b=EL('button','achip '+c.cls+(S.funilFiltro===c.key?' on':''));b.innerHTML=c.ic+'<span class="ct">'+c.n+'</span><span>'+c.label+'</span>';b.onclick=setF(c.key);ach.appendChild(b);});
     if(S.funilFiltro){const vb=EL('button','achip flat');vb.innerHTML='<span>← Ver funil</span>';vb.onclick=()=>{S.funilFiltro=null;render();};ach.appendChild(vb);}
     w.appendChild(ach);
   }
-  // visão filtrada por categoria
-  if(S.funilFiltro&&['reativar','amarelo','vermelho'].includes(S.funilFiltro)){
-    const cfg={
-      reativar:{list:reativar.slice().sort((a,b)=>diasSemResposta(b)-diasSemResposta(a)),title:'Follow-up — reativar',desc:'Tiveram 1º contato, nunca agendaram e sumiram · mais dias sem resposta no topo.'},
-      amarelo:{list:amarelo.slice().sort((a,b)=>diasDesdeVisita(b)-diasDesdeVisita(a)),title:'10+ dias sem ir ao estúdio',desc:'Já fizeram procedimento, sem retorno marcado, há 10 a 19 dias.'},
-      vermelho:{list:vermelho.slice().sort((a,b)=>diasDesdeVisita(b)-diasDesdeVisita(a)),title:'20+ dias sem ir ao estúdio',desc:'Já fizeram procedimento, sem retorno marcado, há 20 dias ou mais.'}
-    }[S.funilFiltro];
+  // visão filtrada
+  if(S.funilFiltro&&(S.funilFiltro==='reativar'||/^m\d+$/.test(S.funilFiltro))){
+    let cfg;
+    if(S.funilFiltro==='reativar') cfg={list:reativar.slice().sort((a,b)=>diasSemResposta(b)-diasSemResposta(a)),title:'Follow-up — reativar',desc:'Tiveram 1º contato, nunca agendaram e sumiram · mais dias sem resposta no topo.'};
+    else { const m=+S.funilFiltro.slice(1); cfg={list:byMarco[m].slice().sort((a,b)=>diasDesdeVisita(b)-diasDesdeVisita(a)),title:m+' dias sem ir ao estúdio',desc:'Já fizeram procedimento, sem retorno marcado, há '+(m>=30?'30 dias ou mais':(m+' a '+(m+4)+' dias'))+' sem comparecer.'}; }
     const hd=EL('div');hd.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px';
     hd.appendChild(Object.assign(EL('div'),{textContent:cfg.title+' ('+cfg.list.length+')',style:'font-weight:800;font-size:17px'}));
     const volta=EL('button','btn ghost sm','Ver funil');volta.onclick=()=>{S.funilFiltro=null;render();};hd.appendChild(volta);
