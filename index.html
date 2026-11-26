@@ -252,7 +252,7 @@ async function boot(){
   await loadAll(); renderShell(); render();
 }
 async function loadAll(){
-  const [pros,serv,prec,leads,fin,cfg,desp,ags]=await Promise.all([
+  const [pros,serv,prec,leads,fin,cfg,desp,ags,cvs]=await Promise.all([
     sb.from('profissionais').select('*').order('ordem'),
     sb.from('servicos').select('*').order('nome'),
     sb.from('servicos_preco').select('*'),
@@ -261,6 +261,7 @@ async function loadAll(){
     sb.from('studio_config').select('*').eq('id',1).maybeSingle(),
     sb.from('despesas').select('*'),
     sb.from('agendamentos').select('*'),
+    sb.from('conversas').select('*').order('ultima_em',{ascending:false}),
   ]);
   S.pros=pros.data||[]; S.servicos=serv.data||[];
   S.precos={}; (prec.data||[]).forEach(p=>S.precos[p.servico_id]=p);
@@ -269,6 +270,7 @@ async function loadAll(){
   S.config=cfg.data||{custo_total_mes:0};
   S.despesas=desp.data||[];
   S.agendamentos=ags.data||[];
+  S.conversas=cvs.data||[];
 }
 const proById=id=>S.pros.find(p=>p.id===id)||{};
 const servById=id=>S.servicos.find(s=>s.id===id)||{};
@@ -295,8 +297,8 @@ const statusLabel=s=>s==='realizado'?'realizado':s==='faltou'?'faltou':s==='canc
 function openDrawer(){document.querySelector('.side')?.classList.add('open');document.getElementById('drawov')?.classList.add('on')}
 function closeDrawer(){document.querySelector('.side')?.classList.remove('open');document.getElementById('drawov')?.classList.remove('on')}
 function renderShell(){
-  let tabs=[['meudia','Meu dia','☀'],['funil','Funil','◇'],['agenda','Agenda','▦'],['clientes','Clientes','♥'],['aniversarios','Aniversários','🎂'],['servicos','Serviços','✦'],['painel','Dashboard','◉']];
-  tabs=tabs.filter(t=>{ if(t[0]==='funil')return canTab('funil'); if(t[0]==='servicos')return canTab('servicos'); return true; });
+  let tabs=[['meudia','Meu dia','☀'],['funil','Funil','◇'],['agenda','Agenda','▦'],['clientes','Clientes','♥'],['conversas','Conversas','💬'],['aniversarios','Aniversários','🎂'],['servicos','Serviços','✦'],['painel','Dashboard','◉']];
+  tabs=tabs.filter(t=>{ if(t[0]==='funil')return canTab('funil'); if(t[0]==='servicos')return canTab('servicos'); if(t[0]==='conversas')return canTab('conversas'); return true; });
   if(isAdmin()){tabs.push(['meta','Meta','❖']);tabs.push(['equipe','Equipe','♛']);}
   const nav=document.getElementById('nav'); nav.innerHTML='';
   tabs.forEach(([k,l,ic])=>{
@@ -322,11 +324,12 @@ function renderShell(){
 function render(){
   const v=document.getElementById('view'); v.innerHTML='';
   // se o usuário não pode ver a aba atual, cai no Meu dia
-  if((S.tab==='funil'&&!canTab('funil'))||(S.tab==='servicos'&&!canTab('servicos'))||((S.tab==='meta'||S.tab==='equipe')&&!isAdmin())) S.tab='meudia';
+  if((S.tab==='funil'&&!canTab('funil'))||(S.tab==='servicos'&&!canTab('servicos'))||(S.tab==='conversas'&&!canTab('conversas'))||((S.tab==='meta'||S.tab==='equipe')&&!isAdmin())) S.tab='meudia';
   if(S.tab==='meudia') v.appendChild(viewMeuDia());
   else if(S.tab==='funil') v.appendChild(viewFunil());
   else if(S.tab==='agenda') v.appendChild(viewAgenda());
   else if(S.tab==='clientes') v.appendChild(viewClientes());
+  else if(S.tab==='conversas') v.appendChild(viewConversas());
   else if(S.tab==='aniversarios') v.appendChild(viewAniversarios());
   else if(S.tab==='servicos') v.appendChild(viewServicos());
   else if(S.tab==='painel') v.appendChild(viewPainel());
@@ -1297,6 +1300,89 @@ function viewAniversarios(){
   w.appendChild(aniversariantesPanel());
   return w;
 }
+// ---------- CONVERSAS (WhatsApp via FZAP) ----------
+async function fzapCall(action,extra){ try{ const {data}=await sb.functions.invoke('fzap-api',{body:Object.assign({action},extra||{})}); return data||{}; }catch(e){ return {error:String(e)}; } }
+function telLabel(t){ const d=String(t||'').replace(/\D/g,''); const n=d.replace(/^55/,''); if(n.length>=10){const ddd=n.slice(0,2),rest=n.slice(2); return '('+ddd+') '+rest.slice(0,rest.length-4)+'-'+rest.slice(-4);} return String(t||''); }
+function nomeDaConversa(c){ const key=(c.telefone||'').replace(/\D/g,''); const l=S.leads.find(x=>x.telefone&&x.telefone.replace(/\D/g,'')===key); return (l&&l.nome)||c.nome||telLabel(c.telefone); }
+function viewConversas(){
+  const w=EL('div'); const t=pageHead('Conversas');
+  if(isAdmin()){const cb=EL('button','btn ghost','📱 Conectar WhatsApp');cb.style.marginLeft='auto';cb.onclick=()=>openConectarWhats();t.appendChild(cb);}
+  w.appendChild(t);
+  const stBar=EL('div','muted'); stBar.style.cssText='margin-top:4px;font-size:13px'; stBar.textContent='Verificando conexão…'; w.appendChild(stBar);
+  fzapCall('status').then(s=>{ stBar.textContent = s&&s.loggedIn ? '🟢 WhatsApp conectado' : '🔴 WhatsApp desconectado — '+(isAdmin()?'toque em "Conectar WhatsApp"':'peça pro Igor conectar'); });
+  const search=document.createElement('input');search.type='text';search.placeholder='Buscar conversa';
+  search.style.cssText='width:100%;max-width:340px;padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--surface);color:var(--ink);margin-top:10px';
+  w.appendChild(search);
+  const list=EL('div','panel'); list.style.marginTop='12px';
+  const draw=()=>{ list.innerHTML='';
+    const q=search.value.trim().toLowerCase();
+    const arr=(S.conversas||[]).filter(c=>{const nm=nomeDaConversa(c).toLowerCase();return !q||nm.includes(q)||(c.telefone||'').includes(q);});
+    if(!arr.length){list.appendChild(Object.assign(EL('div','empty'),{textContent:'Nenhuma conversa ainda. Quando alguém mandar mensagem no WhatsApp do studio, aparece aqui.'}));return;}
+    arr.forEach(c=>{ const row=EL('div','rowline');row.style.cursor='pointer';
+      const left=EL('div');left.style.minWidth='0';
+      const nm=EL('div');nm.style.cssText='font-weight:600;display:flex;align-items:center;gap:7px';
+      nm.appendChild(document.createTextNode(nomeDaConversa(c)));
+      if(c.nao_lidas>0){const b=EL('span');b.textContent=c.nao_lidas;b.style.cssText='background:var(--win);color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px';nm.appendChild(b);}
+      left.appendChild(nm);
+      left.appendChild(Object.assign(EL('div','muted'),{textContent:(c.ultima_msg||'').slice(0,60),style:'font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
+      row.appendChild(left);
+      if(c.ultima_em)row.appendChild(Object.assign(EL('span','muted'),{textContent:new Date(c.ultima_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}),style:'font-size:11.5px;white-space:nowrap'}));
+      row.onclick=()=>openConversa(c.telefone); list.appendChild(row);
+    });
+  };
+  search.oninput=draw; draw(); w.appendChild(list);
+  w.appendChild(Object.assign(EL('p','hint'),{style:'margin-top:8px',textContent:'As mensagens chegam sozinhas. Atualize a página pra ver as novas (tempo real vem depois).'}));
+  return w;
+}
+async function openConversa(telefone){
+  const tel=String(telefone||'').replace(/\D/g,'');
+  const m=EL('div','modal big');
+  const c=(S.conversas||[]).find(x=>x.telefone===telefone)||{telefone};
+  m.appendChild(EL('h3',null,nomeDaConversa(c)));
+  m.appendChild(Object.assign(EL('div','muted'),{textContent:telLabel(tel),style:'margin:-4px 0 10px;font-size:13px'}));
+  const thread=EL('div');thread.style.cssText='max-height:46vh;overflow:auto;display:flex;flex-direction:column;gap:7px;padding:8px;background:var(--bg);border-radius:12px';
+  thread.appendChild(Object.assign(EL('div','muted'),{textContent:'Carregando…',style:'font-size:13px;text-align:center;padding:10px'}));
+  m.appendChild(thread);
+  try{ await sb.from('conversas').update({nao_lidas:0}).eq('telefone',telefone); }catch(_){}
+  const loadMsgs=async()=>{ const {data}=await sb.from('mensagens').select('*').eq('telefone',tel).order('criado_em',{ascending:true});
+    thread.innerHTML='';
+    (data||[]).forEach(mm=>{ const b=EL('div');const mine=mm.direcao==='out';
+      b.style.cssText='max-width:78%;padding:8px 11px;border-radius:12px;font-size:14px;white-space:pre-wrap;word-break:break-word;'+(mine?'align-self:flex-end;background:color-mix(in srgb,var(--gold) 22%,var(--surface))':'align-self:flex-start;background:var(--surface);border:1px solid var(--line)');
+      b.textContent=mm.texto||('['+(mm.tipo||'mídia')+']');
+      const tm=EL('div');tm.style.cssText='font-size:10px;color:var(--muted);margin-top:2px;text-align:right';tm.textContent=mm.criado_em?hhmm(new Date(mm.criado_em)):'';
+      b.appendChild(tm); thread.appendChild(b);
+    });
+    if(!(data||[]).length)thread.appendChild(Object.assign(EL('div','muted'),{textContent:'Sem mensagens ainda.',style:'text-align:center;padding:10px;font-size:13px'}));
+    thread.scrollTop=thread.scrollHeight;
+  };
+  const ov=overlay(m);
+  await loadMsgs();
+  const box=EL('div','row');box.style.cssText='gap:8px;margin-top:10px;align-items:flex-end';
+  const ta=document.createElement('textarea');ta.rows=1;ta.placeholder='Escreva uma mensagem…';ta.style.cssText='flex:1;min-width:0;padding:11px 12px;border:1px solid var(--line2);border-radius:11px;background:var(--surface);color:var(--ink);resize:none;max-height:120px';
+  const send=EL('button','btn','Enviar');
+  const doSend=async()=>{ const txt=ta.value.trim(); if(!txt)return; send.disabled=true;send.textContent='…'; const r=await fzapCall('send',{phone:tel,body:txt}); send.disabled=false;send.textContent='Enviar'; if(r&&r.ok){ta.value='';await loadMsgs();await loadAll();} else {alert('Não consegui enviar. O WhatsApp pode estar desconectado.');} };
+  send.onclick=doSend; ta.onkeydown=ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();doSend();}};
+  box.appendChild(ta);box.appendChild(send);m.appendChild(box); ta.focus();
+}
+async function openConectarWhats(){
+  const m=EL('div','modal'); m.appendChild(EL('h3',null,'📱 Conectar WhatsApp'));
+  const info=EL('div'); info.style.cssText='text-align:center;padding:8px;min-height:240px;display:flex;align-items:center;justify-content:center;flex-direction:column'; info.textContent='Carregando QR Code…'; m.appendChild(info);
+  m.appendChild(Object.assign(EL('p','muted'),{style:'font-size:12.5px;text-align:center',textContent:'No celular do studio: WhatsApp → Aparelhos conectados → Conectar um aparelho → escaneie o código.'}));
+  const ov=overlay(m);
+  let qt=null, pt=null; const stop=()=>{if(qt)clearInterval(qt);if(pt)clearInterval(pt);};
+  const conectado=()=>{ info.innerHTML=''; info.appendChild(Object.assign(EL('div'),{textContent:'✅ Conectado!',style:'font-size:22px;font-weight:700;color:var(--win)'})); stop(); setTimeout(()=>{ov.remove();render();},1400); };
+  const refreshQR=async()=>{ const r=await fzapCall('qr');
+    if(r&&r.loggedIn){conectado();return;}
+    if(r&&r.qrCode){ info.innerHTML=''; const img=document.createElement('img'); img.src=r.qrCode; img.style.cssText='width:236px;height:236px;border-radius:12px;background:#fff;padding:8px'; info.appendChild(img); }
+    else { info.textContent='Gerando QR… (se demorar, feche e abra de novo)'; }
+  };
+  await refreshQR();
+  qt=setInterval(refreshQR,20000);
+  pt=setInterval(async()=>{ const s=await fzapCall('status'); if(s&&s.loggedIn)conectado(); },4000);
+  const mo=new MutationObserver(()=>{ if(!document.body.contains(ov)){stop();mo.disconnect();} });
+  mo.observe(document.body,{childList:true});
+}
+
 // ---------- CLIENTES ----------
 function viewClientes(){
   const w=EL('div'); w.appendChild(pageHead('Clientes'));
@@ -1402,7 +1488,10 @@ function openCliente(c){
   }
   function tabConversas(){
     const pan=EL('div','panel');
-    pan.appendChild(Object.assign(EL('div','empty'),{innerHTML:'💬 A conversa do WhatsApp desta cliente aparece aqui<br>quando a gente conectar o WhatsApp do studio.'}));
+    const tel=(c.telefone||'').replace(/\D/g,'');
+    if(!tel){ pan.appendChild(Object.assign(EL('div','empty'),{textContent:'Sem telefone cadastrado pra conversar.'})); return pan; }
+    pan.appendChild(Object.assign(EL('p','muted'),{style:'font-size:12.5px',textContent:'Conversa do WhatsApp desta cliente.'}));
+    const b=EL('button','btn','💬 Abrir conversa no WhatsApp');b.style.marginTop='8px';b.onclick=()=>{ov.remove();openConversa(c.telefone||tel);};pan.appendChild(b);
     return pan;
   }
   const paint=()=>{
