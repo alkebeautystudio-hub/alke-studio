@@ -104,6 +104,25 @@ button{cursor:pointer}
 .bdayrow.today{background:var(--goldsoft);border-radius:8px;padding:7px 9px;border-bottom:0;margin:3px 0}
 .bdaybanner{display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:12px;background:var(--goldsoft);margin-bottom:12px}
 @media(max-width:640px){.bdaycols{grid-template-columns:1fr}}
+.walayout{display:flex;margin-top:12px;border:1px solid var(--line);border-radius:14px;overflow:hidden;height:min(66vh,600px);background:var(--surface)}
+.walist{width:330px;flex:0 0 330px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.walist .walsearch{padding:10px;border-bottom:1px solid var(--line)}
+.walist .walrows{flex:1 1 auto;min-height:0;overflow:auto}
+.warow{display:flex;gap:10px;align-items:center;padding:11px 12px;cursor:pointer;border-bottom:1px solid var(--line)}
+.warow:hover{background:var(--bg)} .warow.on{background:var(--goldsoft)}
+.wachat{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;min-height:0}
+.wachat .wahead{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.wachat .wabody{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:7px;padding:12px;background:var(--bg)}
+.wachat .wafoot{padding:10px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:flex-end}
+.waback{display:none}
+@media(max-width:720px){
+  .walayout{height:74vh}
+  .walist{width:100%;flex:1 1 auto;border-right:0}
+  .wachat{display:none}
+  .waback{display:inline-flex}
+  .walayout.showchat .walist{display:none}
+  .walayout.showchat .wachat{display:flex}
+}
 .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
 .tag{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;letter-spacing:.02em}
 .tag.org{background:var(--goldsoft);color:var(--gold)}
@@ -1091,6 +1110,7 @@ function openAgendamento(ag,prefill){
     }catch(_){}
     ov.remove(); await loadAll();
     if(leadId){ await recomputeEtapa(leadId); await loadAll(); }
+    if(leadId){ try{ await enviarLinkCadastro(leadId); }catch(_){} }
     render();
   };
   act.appendChild(cancel);act.appendChild(save);m.appendChild(act);
@@ -1302,67 +1322,95 @@ function viewAniversarios(){
 }
 // ---------- CONVERSAS (WhatsApp via FZAP) ----------
 async function fzapCall(action,extra){ try{ const {data}=await sb.functions.invoke('fzap-api',{body:Object.assign({action},extra||{})}); return data||{}; }catch(e){ return {error:String(e)}; } }
+// ao agendar, manda o link de cadastro no WhatsApp (uma vez por cliente, se ainda não completou)
+async function enviarLinkCadastro(leadId){
+  const l=S.leads.find(x=>x.id===leadId); if(!l||!l.telefone||l.cadastro_completo||l.link_cadastro_em) return;
+  const tel=l.telefone.replace(/\D/g,''); if(tel.length<10) return;
+  const prim=(l.nome||'').split(' ')[0]||'';
+  const link='https://alkebeautystudio-hub.github.io/alke-studio/cadastro.html?tel=55'+tel.replace(/^55/,'')+(prim?('&nome='+encodeURIComponent(prim)):'');
+  const msg='Oi'+(prim?(' '+prim):'')+'! 💛 Pra deixar seu atendimento certinho e garantir condições exclusivas do nosso estúdio, completa seu cadastro rapidinho aqui: '+link;
+  const r=await fzapCall('send',{phone:tel,body:msg});
+  if(r&&r.ok){ await sb.from('leads').update({link_cadastro_em:new Date().toISOString()}).eq('id',leadId); }
+}
 function telLabel(t){ const d=String(t||'').replace(/\D/g,''); const n=d.replace(/^55/,''); if(n.length>=10){const ddd=n.slice(0,2),rest=n.slice(2); return '('+ddd+') '+rest.slice(0,rest.length-4)+'-'+rest.slice(-4);} return String(t||''); }
 function nomeDaConversa(c){ const key=(c.telefone||'').replace(/\D/g,''); const l=S.leads.find(x=>x.telefone&&x.telefone.replace(/\D/g,'')===key); return (l&&l.nome)||c.nome||telLabel(c.telefone); }
+// painel da conversa (thread + responder), reaproveitado no 2-colunas e no modal da cliente
+async function threadView(telefone, opts){
+  opts=opts||{}; const tel=String(telefone||'').replace(/\D/g,'');
+  const c=(S.conversas||[]).find(x=>(x.telefone||'').replace(/\D/g,'')===tel)||{telefone:tel};
+  const wrap=EL('div'); wrap.style.cssText='display:flex;flex-direction:column;height:100%;min-height:0';
+  const head=EL('div','wahead');
+  if(opts.onBack){const bk=EL('button','btn ghost sm waback','‹');bk.onclick=opts.onBack;head.appendChild(bk);}
+  const hi=EL('div');hi.style.minWidth='0';
+  hi.appendChild(Object.assign(EL('div'),{textContent:nomeDaConversa(c),style:'font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
+  hi.appendChild(Object.assign(EL('div','muted'),{textContent:telLabel(tel),style:'font-size:12px'}));
+  head.appendChild(hi);
+  const sp=EL('div');sp.style.marginLeft='auto';head.appendChild(sp);
+  const lead=S.leads.find(x=>x.telefone&&x.telefone.replace(/\D/g,'')===tel);
+  if(lead){const vb=EL('button','btn ghost sm','Ver card');vb.onclick=()=>{ if(opts.closeOverlay)opts.closeOverlay(); openLead(lead.id); };head.appendChild(vb);}
+  wrap.appendChild(head);
+  const body=EL('div','wabody'); body.appendChild(Object.assign(EL('div','muted'),{textContent:'Carregando…',style:'text-align:center;padding:10px;font-size:13px'})); wrap.appendChild(body);
+  const loadMsgs=async()=>{ const {data}=await sb.from('mensagens').select('*').eq('telefone',tel).order('criado_em',{ascending:true});
+    body.innerHTML='';
+    (data||[]).forEach(mm=>{ const b=EL('div');const mine=mm.direcao==='out';
+      b.style.cssText='max-width:76%;padding:8px 11px;border-radius:12px;font-size:14px;white-space:pre-wrap;word-break:break-word;'+(mine?'align-self:flex-end;background:color-mix(in srgb,var(--gold) 22%,var(--surface))':'align-self:flex-start;background:var(--surface);border:1px solid var(--line)');
+      b.textContent=mm.texto||('['+(mm.tipo||'mídia')+']');
+      const tm=EL('div');tm.style.cssText='font-size:10px;color:var(--muted);margin-top:2px;text-align:right';tm.textContent=mm.criado_em?hhmm(new Date(mm.criado_em)):'';
+      b.appendChild(tm); body.appendChild(b);
+    });
+    if(!(data||[]).length)body.appendChild(Object.assign(EL('div','muted'),{textContent:'Sem mensagens ainda.',style:'text-align:center;padding:10px;font-size:13px;margin:auto'}));
+    body.scrollTop=body.scrollHeight;
+  };
+  try{ await sb.from('conversas').update({nao_lidas:0}).eq('telefone',telefone); const cc=(S.conversas||[]).find(x=>x.telefone===telefone); if(cc)cc.nao_lidas=0; }catch(_){}
+  await loadMsgs();
+  const foot=EL('div','wafoot');
+  const ta=document.createElement('textarea');ta.rows=1;ta.placeholder='Escreva uma mensagem…';ta.style.cssText='flex:1;min-width:0;padding:11px 12px;border:1px solid var(--line2);border-radius:11px;background:var(--surface);color:var(--ink);resize:none;max-height:120px';
+  const send=EL('button','btn','Enviar');
+  const doSend=async()=>{ const txt=ta.value.trim(); if(!txt)return; send.disabled=true;send.textContent='…'; const r=await fzapCall('send',{phone:tel,body:txt}); send.disabled=false;send.textContent='Enviar'; if(r&&r.ok){ta.value='';await loadMsgs(); if(opts.onSent)opts.onSent();} else {alert('Não consegui enviar. O WhatsApp pode estar desconectado — conecte na aba Conversas.');} };
+  send.onclick=doSend; ta.onkeydown=ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();doSend();}};
+  foot.appendChild(ta);foot.appendChild(send);wrap.appendChild(foot);
+  setTimeout(()=>ta.focus(),50);
+  return wrap;
+}
 function viewConversas(){
   const w=EL('div'); const t=pageHead('Conversas');
   if(isAdmin()){const cb=EL('button','btn ghost','📱 Conectar WhatsApp');cb.style.marginLeft='auto';cb.onclick=()=>openConectarWhats();t.appendChild(cb);}
   w.appendChild(t);
   const stBar=EL('div','muted'); stBar.style.cssText='margin-top:4px;font-size:13px'; stBar.textContent='Verificando conexão…'; w.appendChild(stBar);
   fzapCall('status').then(s=>{ stBar.textContent = s&&s.loggedIn ? '🟢 WhatsApp conectado' : '🔴 WhatsApp desconectado — '+(isAdmin()?'toque em "Conectar WhatsApp"':'peça pro Igor conectar'); });
-  const search=document.createElement('input');search.type='text';search.placeholder='Buscar conversa';
-  search.style.cssText='width:100%;max-width:340px;padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--surface);color:var(--ink);margin-top:10px';
-  w.appendChild(search);
-  const list=EL('div','panel'); list.style.marginTop='12px';
-  const draw=()=>{ list.innerHTML='';
+  const layout=EL('div','walayout');
+  const left=EL('div','walist'); const right=EL('div','wachat');
+  const sb2=EL('div','walsearch'); const search=document.createElement('input');search.type='text';search.placeholder='Buscar conversa';search.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';sb2.appendChild(search);left.appendChild(sb2);
+  const rows=EL('div','walrows'); left.appendChild(rows);
+  const showEmpty=()=>{ right.innerHTML=''; const e=EL('div');e.style.cssText='margin:auto;text-align:center;color:var(--muted);font-size:14px;padding:30px';e.textContent='Escolha uma conversa à esquerda.';right.appendChild(e); layout.classList.remove('showchat'); S.convSel=null; drawRows(); };
+  const openIn=async(tel)=>{ S.convSel=tel; layout.classList.add('showchat'); right.innerHTML=''; right.appendChild(Object.assign(EL('div','muted'),{textContent:'Abrindo…',style:'margin:auto'})); const el=await threadView(tel,{onBack:showEmpty,onSent:drawRows}); right.innerHTML=''; right.appendChild(el); drawRows(); };
+  const drawRows=()=>{ rows.innerHTML='';
     const q=search.value.trim().toLowerCase();
     const arr=(S.conversas||[]).filter(c=>{const nm=nomeDaConversa(c).toLowerCase();return !q||nm.includes(q)||(c.telefone||'').includes(q);});
-    if(!arr.length){list.appendChild(Object.assign(EL('div','empty'),{textContent:'Nenhuma conversa ainda. Quando alguém mandar mensagem no WhatsApp do studio, aparece aqui.'}));return;}
-    arr.forEach(c=>{ const row=EL('div','rowline');row.style.cursor='pointer';
-      const left=EL('div');left.style.minWidth='0';
-      const nm=EL('div');nm.style.cssText='font-weight:600;display:flex;align-items:center;gap:7px';
-      nm.appendChild(document.createTextNode(nomeDaConversa(c)));
-      if(c.nao_lidas>0){const b=EL('span');b.textContent=c.nao_lidas;b.style.cssText='background:var(--win);color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px';nm.appendChild(b);}
-      left.appendChild(nm);
-      left.appendChild(Object.assign(EL('div','muted'),{textContent:(c.ultima_msg||'').slice(0,60),style:'font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
-      row.appendChild(left);
-      if(c.ultima_em)row.appendChild(Object.assign(EL('span','muted'),{textContent:new Date(c.ultima_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}),style:'font-size:11.5px;white-space:nowrap'}));
-      row.onclick=()=>openConversa(c.telefone); list.appendChild(row);
+    if(!arr.length){rows.appendChild(Object.assign(EL('div','muted'),{textContent:'Nenhuma conversa ainda.',style:'padding:16px;font-size:13px;text-align:center'}));return;}
+    arr.forEach(c=>{ const row=EL('div','warow'+(S.convSel&&(c.telefone||'').replace(/\D/g,'')===String(S.convSel).replace(/\D/g,'')?' on':''));
+      const av=EL('div');av.style.cssText='width:38px;height:38px;border-radius:50%;background:var(--goldsoft);color:var(--gold);font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto';av.textContent=(nomeDaConversa(c)[0]||'?').toUpperCase();
+      const mid=EL('div');mid.style.cssText='flex:1 1 auto;min-width:0';
+      const l1=EL('div');l1.style.cssText='display:flex;align-items:center;gap:6px';
+      l1.appendChild(Object.assign(EL('div'),{textContent:nomeDaConversa(c),style:'font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto'}));
+      if(c.nao_lidas>0){const b=EL('span');b.textContent=c.nao_lidas;b.style.cssText='background:var(--win);color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;flex:0 0 auto';l1.appendChild(b);}
+      mid.appendChild(l1);
+      mid.appendChild(Object.assign(EL('div','muted'),{textContent:(c.ultima_msg||'').slice(0,42),style:'font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
+      row.appendChild(av);row.appendChild(mid);
+      row.onclick=()=>openIn(c.telefone);
+      rows.appendChild(row);
     });
   };
-  search.oninput=draw; draw(); w.appendChild(list);
-  w.appendChild(Object.assign(EL('p','hint'),{style:'margin-top:8px',textContent:'As mensagens chegam sozinhas. Atualize a página pra ver as novas (tempo real vem depois).'}));
+  search.oninput=drawRows;
+  layout.appendChild(left); layout.appendChild(right); w.appendChild(layout);
+  if(S.convSel) openIn(S.convSel); else showEmpty();
   return w;
 }
 async function openConversa(telefone){
-  const tel=String(telefone||'').replace(/\D/g,'');
-  const m=EL('div','modal big');
-  const c=(S.conversas||[]).find(x=>x.telefone===telefone)||{telefone};
-  m.appendChild(EL('h3',null,nomeDaConversa(c)));
-  m.appendChild(Object.assign(EL('div','muted'),{textContent:telLabel(tel),style:'margin:-4px 0 10px;font-size:13px'}));
-  const thread=EL('div');thread.style.cssText='max-height:46vh;overflow:auto;display:flex;flex-direction:column;gap:7px;padding:8px;background:var(--bg);border-radius:12px';
-  thread.appendChild(Object.assign(EL('div','muted'),{textContent:'Carregando…',style:'font-size:13px;text-align:center;padding:10px'}));
-  m.appendChild(thread);
-  try{ await sb.from('conversas').update({nao_lidas:0}).eq('telefone',telefone); }catch(_){}
-  const loadMsgs=async()=>{ const {data}=await sb.from('mensagens').select('*').eq('telefone',tel).order('criado_em',{ascending:true});
-    thread.innerHTML='';
-    (data||[]).forEach(mm=>{ const b=EL('div');const mine=mm.direcao==='out';
-      b.style.cssText='max-width:78%;padding:8px 11px;border-radius:12px;font-size:14px;white-space:pre-wrap;word-break:break-word;'+(mine?'align-self:flex-end;background:color-mix(in srgb,var(--gold) 22%,var(--surface))':'align-self:flex-start;background:var(--surface);border:1px solid var(--line)');
-      b.textContent=mm.texto||('['+(mm.tipo||'mídia')+']');
-      const tm=EL('div');tm.style.cssText='font-size:10px;color:var(--muted);margin-top:2px;text-align:right';tm.textContent=mm.criado_em?hhmm(new Date(mm.criado_em)):'';
-      b.appendChild(tm); thread.appendChild(b);
-    });
-    if(!(data||[]).length)thread.appendChild(Object.assign(EL('div','muted'),{textContent:'Sem mensagens ainda.',style:'text-align:center;padding:10px;font-size:13px'}));
-    thread.scrollTop=thread.scrollHeight;
-  };
+  const m=EL('div','modal big'); m.style.height='70vh'; m.style.display='flex'; m.style.flexDirection='column'; m.style.padding='0'; m.style.overflow='hidden';
   const ov=overlay(m);
-  await loadMsgs();
-  const box=EL('div','row');box.style.cssText='gap:8px;margin-top:10px;align-items:flex-end';
-  const ta=document.createElement('textarea');ta.rows=1;ta.placeholder='Escreva uma mensagem…';ta.style.cssText='flex:1;min-width:0;padding:11px 12px;border:1px solid var(--line2);border-radius:11px;background:var(--surface);color:var(--ink);resize:none;max-height:120px';
-  const send=EL('button','btn','Enviar');
-  const doSend=async()=>{ const txt=ta.value.trim(); if(!txt)return; send.disabled=true;send.textContent='…'; const r=await fzapCall('send',{phone:tel,body:txt}); send.disabled=false;send.textContent='Enviar'; if(r&&r.ok){ta.value='';await loadMsgs();await loadAll();} else {alert('Não consegui enviar. O WhatsApp pode estar desconectado.');} };
-  send.onclick=doSend; ta.onkeydown=ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();doSend();}};
-  box.appendChild(ta);box.appendChild(send);m.appendChild(box); ta.focus();
+  const el=await threadView(telefone,{closeOverlay:()=>ov.remove()});
+  m.appendChild(el);
 }
 async function openConectarWhats(){
   const m=EL('div','modal'); m.appendChild(EL('h3',null,'📱 Conectar WhatsApp'));
