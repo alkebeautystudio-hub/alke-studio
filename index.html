@@ -1454,9 +1454,9 @@ function viewConversas(){
       const mid=EL('div');mid.style.cssText='flex:1 1 auto;min-width:0';
       const l1=EL('div');l1.style.cssText='display:flex;align-items:center;gap:6px';
       const unread=c.nao_lidas>0;
-      const dot=EL('span');dot.title=unread?'não lida':'lida';dot.style.cssText='width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:'+(unread?'var(--gold)':'var(--win)');l1.appendChild(dot);
-      l1.appendChild(Object.assign(EL('div'),{textContent:nomeDaConversa(c),style:'font-weight:'+(unread?'700':'600')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto'}));
-      if(unread){const b=EL('span');b.textContent=c.nao_lidas;b.style.cssText='background:var(--gold);color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;flex:0 0 auto';l1.appendChild(b);}
+      if(unread) row.style.background='color-mix(in srgb,var(--win) 9%,transparent)';
+      l1.appendChild(Object.assign(EL('div'),{textContent:nomeDaConversa(c),style:'font-weight:'+(unread?'700':'600')+';color:'+(unread?'var(--ink)':'inherit')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto'}));
+      if(unread){const b=EL('span');b.textContent=c.nao_lidas;b.style.cssText='background:var(--win);color:#fff;font-size:11.5px;font-weight:700;min-width:20px;height:20px;border-radius:999px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto';l1.appendChild(b);}
       mid.appendChild(l1);
       mid.appendChild(Object.assign(EL('div','muted'),{textContent:(c.ultima_msg||'').slice(0,42),style:'font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
       row.appendChild(av);row.appendChild(mid);
