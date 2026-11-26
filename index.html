@@ -222,7 +222,7 @@ body.scroll-locked{overflow:hidden}
 .agblk{position:absolute;left:3px;right:3px;border-radius:8px;padding:3px 7px;font-size:11.5px;line-height:1.25;overflow:hidden;cursor:pointer;color:var(--ink);border-left:3px solid var(--gold)}
 .agblk b{display:block;font-size:12px;font-weight:600}
 /* ====== MODAL ====== */
-.ov{position:fixed;inset:0;background:rgba(40,28,20,.5);display:grid;place-items:center;padding:16px;z-index:50}
+.ov{position:fixed;inset:0;background:rgba(40,28,20,.5);display:grid;place-items:center;padding:16px;z-index:70}
 .modal{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);width:100%;max-width:460px;max-height:92vh;overflow:auto;padding:22px}
 .modal h3{font-size:21px;margin-bottom:4px}
 .modal.big{max-width:600px}
@@ -669,21 +669,33 @@ function servicosBloco(id,closer){
 function openLead(id){
   const l=S.leads.find(x=>x.id===id); if(!l){return;}
   const m=EL('div','modal big');
-  const head=EL('div','row spread'); head.appendChild(EL('h3',null,l.nome||'Cliente'));
-  const editb=EL('button','btn ghost sm','✏️ Editar dados'); editb.onclick=()=>{ov.remove();openEditarCliente(id)}; head.appendChild(editb);
+  const telK=(l.telefone||'').replace(/\D/g,'');
+  const convo=(S.conversas||[]).find(c=>(c.telefone||'').replace(/\D/g,'')===telK)||{telefone:l.telefone,nome:l.nome};
+  // cabeçalho: avatar + nome + telefone + fechar
+  const head=EL('div');head.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:14px';
+  head.appendChild(avatarEl(convo,46,true));
+  const hi=EL('div');hi.style.cssText='flex:1;min-width:0';
+  hi.appendChild(Object.assign(EL('div'),{textContent:l.nome||'Cliente',style:'font-weight:800;font-size:18px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
+  const sub=[l.telefone?telLabel(l.telefone):'',l.instagram].filter(Boolean).join(' · ');
+  if(sub)hi.appendChild(Object.assign(EL('div','muted'),{textContent:sub,style:'font-size:13px;margin-top:2px'}));
+  head.appendChild(hi);
+  const x=ibtn(ICON.back);x.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';x.onclick=()=>ov.remove();head.appendChild(x);
   m.appendChild(head);
-  const sub=[l.telefone,l.instagram].filter(Boolean).join('  ·  '); if(sub)m.appendChild(Object.assign(EL('div','muted'),{textContent:sub,style:'margin:-4px 0 12px;font-size:13px'}));
-  m.appendChild(Object.assign(EL('div','eyebrow'),{textContent:'Etapa',style:'margin-bottom:5px'}));
+  // ações rápidas
+  const qa=EL('div');qa.style.cssText='display:flex;gap:8px;margin-bottom:16px';
+  if(telK){const ac=EL('button','btn','Abrir conversa');ac.style.flex='1';ac.onclick=()=>{ov.remove();S.convSel=l.telefone;S.tab='conversas';renderShell();render();};qa.appendChild(ac);}
+  const ed=EL('button','btn ghost','Editar dados');ed.onclick=()=>{ov.remove();openEditarCliente(id)};qa.appendChild(ed);
+  m.appendChild(qa);
+  m.appendChild(Object.assign(EL('div','eyebrow'),{textContent:'Etapa',style:'margin-bottom:6px'}));
   const pills=EL('div','stagepills');
   ETAPAS.forEach(e=>{const b=EL('button','sp'+(e.k===(l.etapa||'lead')?' on':''),e.l);b.onclick=async()=>{await move(l,e.k);ov.remove();openLead(id)};pills.appendChild(b)});
   m.appendChild(pills);
-  if(l.retorno){m.appendChild(Object.assign(EL('div','muted'),{textContent:'🔁 Retorno marcado: '+brDate(l.retorno,{day:'2-digit',month:'2-digit',year:'numeric'}),style:'margin-top:9px;font-size:13px'}));}
+  if(l.retorno){m.appendChild(Object.assign(EL('div','muted'),{textContent:'Retorno marcado: '+brDate(l.retorno,{day:'2-digit',month:'2-digit',year:'numeric'}),style:'margin-top:10px;font-size:13px'}));}
   if(l.proxima_acao)m.appendChild(Object.assign(EL('div','muted'),{textContent:'→ '+l.proxima_acao,style:'margin-top:5px;font-size:13px'}));
   m.appendChild(servicosBloco(id,()=>ov.remove()));
   const act=EL('div','mactions');
-  const close=EL('button','btn ghost','Fechar');close.onclick=()=>ov.remove();
-  const ver=EL('button','btn','Ver cadastro completo');ver.onclick=()=>{ov.remove();openCliente(clienteDoLead(id))};
-  act.appendChild(close);act.appendChild(ver);m.appendChild(act);
+  const ver=EL('button','btn ghost','Ver cadastro completo');ver.onclick=()=>{ov.remove();openCliente(clienteDoLead(id))};
+  act.appendChild(ver);m.appendChild(act);
   const ov=overlay(m);
 }
 // ficha de edicao de dados da cliente
