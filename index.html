@@ -485,7 +485,7 @@ function leadAlert(l){
   if(l.etapa==='retorno' && l.retorno){const dd=Math.ceil((new Date(l.retorno+'T00:00:00')-new Date())/864e5); if(dd<=0)return{cls:'al',txt:'retorno atrasado'}; if(dd<=7)return{cls:'wn',txt:'retorno em '+dd+'d'};}
   if(l.etapa==='realizou' && !l.retorno && l.realizado_em){const dias=Math.floor((new Date()-new Date(l.realizado_em))/864e5); if(dias>=40)return{cls:'al',txt:dias+' dias parada'}; if(dias>=20)return{cls:'wn',txt:dias+' dias parada'};}
   if(l.proxima_acao_em && new Date(l.proxima_acao_em)<new Date()) return {cls:'al',txt:'atrasado'};
-  if((l.etapa==='conversa'||l.etapa==='followup') && !l.proxima_acao_em) return {cls:'wn',txt:'responder'};
+  if(l.etapa==='conversa' && !l.proxima_acao_em) return {cls:'wn',txt:'responder'};
   return null;
 }
 function viewFunil(){
@@ -710,10 +710,10 @@ function openLead(id){
   head.appendChild(hi);
   const x=ibtn(ICON.back);x.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';x.onclick=()=>ov.remove();head.appendChild(x);
   m.appendChild(head);
-  // Agendar + conversa
+  // Agendar + abrir conversa
   const topact=EL('div');topact.style.cssText='display:flex;gap:8px;margin-bottom:12px';
   const agb=EL('button','btn','Agendar');agb.style.flex='1';agb.onclick=()=>{ov.remove();openAgendamento(null,{lead_id:id,cliente_nome:l.nome,cliente_telefone:l.telefone});};topact.appendChild(agb);
-  if(telK){const ac=EL('button','btn ghost','Editar dados');ac.onclick=()=>{ov.remove();openEditarCliente(id)};topact.appendChild(ac);}
+  if(telK){const ac=EL('button','btn ghost','Abrir conversa');ac.style.flex='1';ac.onclick=()=>{ov.remove();S.convSel=l.telefone;S.tab='conversas';renderShell();render();};topact.appendChild(ac);}
   m.appendChild(topact);
   // etapa (seletor compacto)
   const etRow=EL('div');etRow.style.cssText='margin-bottom:14px;position:relative';
@@ -731,7 +731,11 @@ function openLead(id){
     [['Telefone',l.telefone?telLabel(l.telefone):'—'],['Nascimento',l.nascimento?brDate(l.nascimento,{day:'2-digit',month:'2-digit',year:'numeric'}):'—'],['Origem',l.origem||'—'],['Instagram',l.instagram||'—'],['Entrou',l.criado_em?brDate(l.criado_em,{day:'2-digit',month:'2-digit',year:'numeric'}):'—']].forEach(([k,v])=>{const r=EL('div','inforow');r.innerHTML='<span class="k"></span><span class="v"></span>';r.querySelector('.k').textContent=k;r.querySelector('.v').textContent=v;d.appendChild(r);});
     if(l.obs){const o=EL('div');o.style.marginTop='12px';o.innerHTML='<div class="eyebrow" style="margin-bottom:4px">Observações</div>';o.appendChild(Object.assign(EL('div'),{textContent:l.obs,style:'font-size:14px'}));d.appendChild(o);}
     if(l.proxima_acao)d.appendChild(Object.assign(EL('div','muted'),{textContent:'→ '+l.proxima_acao,style:'margin-top:10px;font-size:13px'}));
-    d.appendChild(servicosBloco(id,()=>ov.remove())); return d; };
+    d.appendChild(servicosBloco(id,()=>ov.remove()));
+    const footr=EL('div');footr.style.cssText='display:flex;gap:8px;margin-top:14px';
+    const ed=EL('button','btn ghost sm','Editar dados');ed.onclick=()=>{ov.remove();openEditarCliente(id)};footr.appendChild(ed);
+    const vc=EL('button','btn ghost sm','Cadastro completo');vc.onclick=()=>{ov.remove();openCliente(clienteDoLead(id))};footr.appendChild(vc);
+    d.appendChild(footr); return d; };
   const atividadesView=()=>{ const d=EL('div'); const items=[];
     servicosDoLead(id).forEach(a=>{const sv=servById(a.servico_id),pro=proById(a.profissional_id);const dt=a.realizado_em||a.inicio;const st=a.status==='realizado'?'Realizou':(a.status==='faltou'?'Faltou':'Agendado');items.push({dt,tt:st+' · '+(sv.nome||'serviço'),td:[pro.nome,dt?brDate(dt,{day:'2-digit',month:'2-digit'})+' '+hhmm(new Date(dt)):''].filter(Boolean).join(' · ')});});
     if(l.retorno)items.push({dt:l.retorno,tt:'Retorno marcado',td:brDate(l.retorno,{day:'2-digit',month:'2-digit',year:'numeric'})});
@@ -1538,6 +1542,20 @@ function avatarEl(c,size,fetchAvatar){ size=size||38;
 }
 function midiaLabel(tipo,texto){ const m={image:'📷 Foto',audio:'🎤 Áudio',ptt:'🎤 Áudio',video:'🎥 Vídeo',sticker:'🩷 Figurinha',location:'📍 Localização',doc:'📄 '+(texto&&texto[0]!=='['?texto:'Documento'),document:'📄 '+(texto&&texto[0]!=='['?texto:'Documento')}; return m[tipo]||null; }
 function stripBucket(u){ return u?u.replace('/kairo-fzap-media-buffer/','/'):u; }
+// abre imagem em modal (lightbox) dentro da conversa, sem redirecionar
+function openImgModal(url){ const m=EL('div');m.style.cssText='position:fixed;inset:0;z-index:95;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:16px;animation:ovin .15s ease';
+  const im=document.createElement('img');im.src=url;im.style.cssText='max-width:100%;max-height:100%;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.5)';
+  const close=EL('button');close.innerHTML='<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';close.style.cssText='position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:16px;background:rgba(255,255,255,.12);border:0;border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;cursor:pointer';
+  m.appendChild(im);m.appendChild(close);m.onclick=()=>m.remove();document.body.appendChild(m); }
+// prepara imagem antes de enviar: corrige orientação (EXIF) e reduz tamanho (envio mais rápido)
+async function prepareImage(file){
+  try{
+    let bmp; try{ bmp=await createImageBitmap(file,{imageOrientation:'from-image'}); }catch(_){ bmp=await createImageBitmap(file); }
+    let w=bmp.width,h=bmp.height; const max=1600; if(Math.max(w,h)>max){const s=max/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(bmp,0,0,w,h);
+    return cv.toDataURL('image/jpeg',0.82);
+  }catch(e){ return null; }
+}
 async function resolveMedia(mm){ if(mm.midia_url)return stripBucket(mm.midia_url); if(!mm.wa_id)return null; const r=await fzapCall('media',{id:mm.wa_id}); if(r&&r.url){mm.midia_url=r.url;return stripBucket(r.url);} return null; }
 // monta a mídia dentro da bolha. io = IntersectionObserver pra carregar imagem só quando aparece
 function buildMedia(mm,io){
@@ -1545,7 +1563,7 @@ function buildMedia(mm,io){
   const wrap=EL('div');
   if(img){
     const ph=EL('div');ph.style.cssText='min-width:140px;min-height:90px;max-width:230px;border-radius:9px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;cursor:pointer';ph.textContent=tp==='sticker'?'🩷 Figurinha':'📷 Foto';
-    ph._load=async()=>{ ph.textContent='carregando…'; const url=await resolveMedia(mm); if(!url){ph.textContent=(tp==='sticker'?'🩷 Figurinha':'📷 Foto')+' (indisponível)';return;} const im=document.createElement('img');im.src=url;im.style.cssText='max-width:230px;max-height:260px;border-radius:9px;display:block';im.onclick=()=>window.open(url,'_blank');im.onerror=()=>{ph.textContent='📷 Foto (indisponível)';}; ph.replaceWith(im); };
+    ph._load=async()=>{ ph.textContent='carregando…'; const url=await resolveMedia(mm); if(!url){ph.textContent=(tp==='sticker'?'🩷 Figurinha':'📷 Foto')+' (indisponível)';return;} const im=document.createElement('img');im.src=url;im.style.cssText='max-width:230px;max-height:260px;border-radius:9px;display:block';im.style.cursor='zoom-in';im.onclick=()=>openImgModal(url);im.onerror=()=>{ph.textContent='📷 Foto (indisponível)';}; ph.replaceWith(im); };
     if(io)io.observe(ph); else setTimeout(()=>ph._load(),0);
     wrap.appendChild(ph);
   } else if(tp==='audio'||tp==='ptt'){
@@ -1613,7 +1631,8 @@ async function threadView(telefone, opts){
   const prov=()=>(S.me&&S.me.nome)||null;
   const fileToData=(file)=>new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file);});
   const envMidia=async(file,kind,caption)=>{ if(!file)return; const prev=foot.style.opacity; foot.style.opacity='.5';
-    try{ const data=await fileToData(file); const r=await fzapCall('sendmedia',{phone:tel,kind:kind,data:data,fileName:file.name||'',caption:caption||'',enviado_por:prov()});
+    try{ let data=(kind==='image')?(await prepareImage(file)):null; if(!data) data=await fileToData(file);
+      const r=await fzapCall('sendmedia',{phone:tel,kind:kind,data:data,fileName:file.name||'foto.jpg',caption:caption||'',enviado_por:prov()});
       if(r&&r.ok){ await loadMsgs(); if(opts.onSent)opts.onSent(); } else alert('Não consegui enviar o arquivo. Verifique a conexão do WhatsApp.'); }
     catch(e){ alert('Erro ao preparar o arquivo.'); } finally{ foot.style.opacity=prev; } };
   // inputs ocultos
