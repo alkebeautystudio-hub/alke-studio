@@ -12,7 +12,13 @@
 <meta name="apple-mobile-web-app-title" content="Alke Studio">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icon-192.png">
-<script>if('serviceWorker' in navigator){addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}</script>
+<script>if('serviceWorker' in navigator){addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}
+// auto-atualiza quando reabrir o app: compara o ETag do index.html e recarrega se mudou
+(function(){var u=location.pathname,tag=null;
+ function get(cb){fetch(u,{cache:'no-store',method:'HEAD'}).then(function(r){cb(r.headers.get('etag')||r.headers.get('last-modified'))}).catch(function(){cb(null)})}
+ get(function(t){tag=t});
+ document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'&&tag){ get(function(t){ if(t&&t!==tag){ location.reload(); } }); } });
+})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
