@@ -1769,7 +1769,7 @@ function openCliente(c){
     const tel=(c.telefone||'').replace(/\D/g,'');
     if(!tel){ pan.appendChild(Object.assign(EL('div','empty'),{textContent:'Sem telefone cadastrado pra conversar.'})); return pan; }
     pan.appendChild(Object.assign(EL('p','muted'),{style:'font-size:12.5px',textContent:'Conversa do WhatsApp desta cliente.'}));
-    const b=EL('button','btn','💬 Abrir conversa no WhatsApp');b.style.marginTop='8px';b.onclick=()=>{ov.remove();openConversa(c.telefone||tel);};pan.appendChild(b);
+    const b=EL('button','btn','Abrir conversa');b.style.marginTop='8px';b.onclick=()=>{ov.remove();S.convSel=(c.telefone||tel);S.tab='conversas';renderShell();render();};pan.appendChild(b);
     return pan;
   }
   const paint=()=>{
