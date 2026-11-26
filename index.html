@@ -399,7 +399,7 @@ function viewFunil(){
     if(!q){results.style.display='none';return;}
     const key=q.replace(/\D/g,'');
     const matches=S.leads.filter(l=>(l.nome||'').toLowerCase().includes(q)||(key&&(l.telefone||'').replace(/\D/g,'').includes(key))).slice(0,10);
-    if(!matches.length){results.style.display='block';results.appendChild(Object.assign(EL('div','muted'),{textContent:'Nenhuma cliente com esse nome',style:'padding:11px 12px;font-size:13px'}));return;}
+    if(!matches.length){results.style.display='block';results.appendChild(Object.assign(EL('div','muted'),{textContent:'Nenhuma cliente com esse nome ou telefone',style:'padding:11px 12px;font-size:13px'}));return;}
     matches.forEach(l=>{
       const r=EL('div'); r.style.cssText='padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line)';
       r.onmouseenter=()=>r.style.background='var(--goldsoft)'; r.onmouseleave=()=>r.style.background='';
@@ -469,6 +469,7 @@ function cardLead(l){
   if(l.origem) tags.appendChild(EL('span','tag org',l.origem));
   const al=leadAlert(l); if(al) tags.appendChild(EL('span','tag '+al.cls,al.txt));
   if(l.retorno){const dd=Math.ceil((new Date(l.retorno)-new Date())/864e5);if(dd<=7)tags.appendChild(EL('span','tag wn',dd<=0?'retorno hoje':'retorno '+dd+'d'));}
+  if((l.etapa||'')==='followup'){ const _k=(l.telefone||'').replace(/\D/g,''); const _c=_k&&(S.conversas||[]).find(c=>(c.telefone||'').replace(/\D/g,'')===_k); const _base=_c&&_c.ultima_em?new Date(_c.ultima_em):(l.atualizado_em?new Date(l.atualizado_em):null); if(_base){const _d=Math.floor((Date.now()-_base.getTime())/864e5); tags.appendChild(EL('span','tag al','⏳ '+(_d<=0?'hoje':_d+'d sem resposta')));} }
   const bd=bdayInfo(l.nascimento);
   if(bd){
     if(bd.today){tags.appendChild(EL('span','tag money','🎂 aniversário hoje'));c.style.background='var(--goldsoft)';}
@@ -1349,6 +1350,18 @@ async function enviarLinkCadastro(leadId){
 }
 function telLabel(t){ const d=String(t||'').replace(/\D/g,''); const n=d.replace(/^55/,''); if(n.length>=10){const ddd=n.slice(0,2),rest=n.slice(2); return '('+ddd+') '+rest.slice(0,rest.length-4)+'-'+rest.slice(-4);} return String(t||''); }
 function nomeDaConversa(c){ const key=(c.telefone||'').replace(/\D/g,''); const l=S.leads.find(x=>x.telefone&&x.telefone.replace(/\D/g,'')===key); return (l&&l.nome)||c.nome||telLabel(c.telefone); }
+const _avTried={};
+// bolinha de avatar: mostra foto se tiver (cacheada), senão inicial. fetchAvatar=true busca no WhatsApp (só na conversa aberta)
+function avatarEl(c,size,fetchAvatar){ size=size||38;
+  const d=EL('div');d.style.cssText='width:'+size+'px;height:'+size+'px;border-radius:50%;background:var(--goldsoft);color:var(--gold);font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto;overflow:hidden;font-size:'+Math.round(size*0.42)+'px';
+  d.textContent=(nomeDaConversa(c)[0]||'?').toUpperCase();
+  const setImg=(url)=>{ if(!url)return; const im=document.createElement('img');im.src=url;im.style.cssText='width:100%;height:100%;object-fit:cover';im.onload=()=>{d.textContent='';d.appendChild(im);};im.onerror=()=>{}; };
+  if(c.avatar_url){ setImg(c.avatar_url); return d; }
+  const tel=(c.telefone||'').replace(/\D/g,'');
+  if(fetchAvatar && tel && !_avTried[tel]){ _avTried[tel]=1; fzapCall('avatar',{phone:tel}).then(r=>{ if(r&&r.avatar){ c.avatar_url=r.avatar; const cc=(S.conversas||[]).find(x=>(x.telefone||'').replace(/\D/g,'')===tel); if(cc)cc.avatar_url=r.avatar; setImg(r.avatar); } }).catch(()=>{}); }
+  return d;
+}
+function midiaLabel(tipo,texto){ const m={image:'📷 Foto',audio:'🎤 Áudio',ptt:'🎤 Áudio',video:'🎥 Vídeo',sticker:'🩷 Figurinha',location:'📍 Localização',doc:'📄 '+(texto&&texto[0]!=='['?texto:'Documento'),document:'📄 '+(texto&&texto[0]!=='['?texto:'Documento')}; return m[tipo]||null; }
 // painel da conversa (thread + responder), reaproveitado no 2-colunas e no modal da cliente
 async function threadView(telefone, opts){
   opts=opts||{}; const tel=String(telefone||'').replace(/\D/g,'');
@@ -1356,11 +1369,13 @@ async function threadView(telefone, opts){
   const wrap=EL('div'); wrap.style.cssText='display:flex;flex-direction:column;height:100%;min-height:0';
   const head=EL('div','wahead');
   if(opts.onBack){const bk=EL('button','btn ghost sm waback','‹');bk.onclick=opts.onBack;head.appendChild(bk);}
+  head.appendChild(avatarEl(c,40,true));
   const hi=EL('div');hi.style.minWidth='0';
   hi.appendChild(Object.assign(EL('div'),{textContent:nomeDaConversa(c),style:'font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
   hi.appendChild(Object.assign(EL('div','muted'),{textContent:telLabel(tel),style:'font-size:12px'}));
   head.appendChild(hi);
   const sp=EL('div');sp.style.marginLeft='auto';head.appendChild(sp);
+  const unb=EL('button','btn ghost sm','●');unb.title='Marcar como não lida';unb.style.fontSize='10px';unb.onclick=async()=>{ await fzapCall('markunread',{phone:tel}); const cc=(S.conversas||[]).find(x=>(x.telefone||'').replace(/\D/g,'')===tel); if(cc)cc.nao_lidas=1; if(opts.onSent)opts.onSent(); if(opts.onBack)opts.onBack(); };head.appendChild(unb);
   const lead=S.leads.find(x=>x.telefone&&x.telefone.replace(/\D/g,'')===tel);
   if(lead){const vb=EL('button','btn ghost sm','Ver card');vb.onclick=()=>{ if(opts.closeOverlay)opts.closeOverlay(); openLead(lead.id); };head.appendChild(vb);}
   wrap.appendChild(head);
@@ -1369,13 +1384,16 @@ async function threadView(telefone, opts){
     body.innerHTML='';
     (data||[]).forEach(mm=>{ const b=EL('div');const mine=mm.direcao==='out';
       b.style.cssText='max-width:76%;padding:8px 11px;border-radius:12px;font-size:14px;white-space:pre-wrap;word-break:break-word;'+(mine?'align-self:flex-end;background:color-mix(in srgb,var(--gold) 22%,var(--surface))':'align-self:flex-start;background:var(--surface);border:1px solid var(--line)');
-      b.textContent=mm.texto||('['+(mm.tipo||'mídia')+']');
+      const ml=midiaLabel(mm.tipo,mm.texto);
+      if(ml){ const mi=EL('div');mi.textContent=ml;mi.style.cssText='font-style:italic;color:var(--muted)';b.appendChild(mi); }
+      else { b.appendChild(document.createTextNode(mm.texto||'')); }
       const tm=EL('div');tm.style.cssText='font-size:10px;color:var(--muted);margin-top:2px;text-align:right';tm.textContent=mm.criado_em?hhmm(new Date(mm.criado_em)):'';
       b.appendChild(tm); body.appendChild(b);
     });
     if(!(data||[]).length)body.appendChild(Object.assign(EL('div','muted'),{textContent:'Sem mensagens ainda.',style:'text-align:center;padding:10px;font-size:13px;margin:auto'}));
-    body.scrollTop=body.scrollHeight;
+    requestAnimationFrame(()=>{body.scrollTop=body.scrollHeight;});
   };
+  wrap._toBottom=()=>{requestAnimationFrame(()=>{body.scrollTop=body.scrollHeight;});};
   try{ await sb.from('conversas').update({nao_lidas:0}).eq('telefone',telefone); const cc=(S.conversas||[]).find(x=>x.telefone===telefone); if(cc)cc.nao_lidas=0; }catch(_){}
   await loadMsgs();
   const foot=EL('div','wafoot');
@@ -1398,13 +1416,13 @@ function viewConversas(){
   const sb2=EL('div','walsearch'); const search=document.createElement('input');search.type='text';search.placeholder='Buscar conversa';search.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';sb2.appendChild(search);left.appendChild(sb2);
   const rows=EL('div','walrows'); left.appendChild(rows);
   const showEmpty=()=>{ right.innerHTML=''; const e=EL('div');e.style.cssText='margin:auto;text-align:center;color:var(--muted);font-size:14px;padding:30px';e.textContent='Escolha uma conversa à esquerda.';right.appendChild(e); layout.classList.remove('showchat'); S.convSel=null; drawRows(); };
-  const openIn=async(tel)=>{ S.convSel=tel; layout.classList.add('showchat'); right.innerHTML=''; right.appendChild(Object.assign(EL('div','muted'),{textContent:'Abrindo…',style:'margin:auto'})); const el=await threadView(tel,{onBack:showEmpty,onSent:drawRows}); right.innerHTML=''; right.appendChild(el); drawRows(); };
+  const openIn=async(tel)=>{ S.convSel=tel; layout.classList.add('showchat'); right.innerHTML=''; right.appendChild(Object.assign(EL('div','muted'),{textContent:'Abrindo…',style:'margin:auto'})); const el=await threadView(tel,{onBack:showEmpty,onSent:drawRows}); right.innerHTML=''; right.appendChild(el); if(el._toBottom)el._toBottom(); drawRows(); };
   const drawRows=()=>{ rows.innerHTML='';
     const q=search.value.trim().toLowerCase();
     const arr=(S.conversas||[]).filter(c=>{const nm=nomeDaConversa(c).toLowerCase();return !q||nm.includes(q)||(c.telefone||'').includes(q);});
     if(!arr.length){rows.appendChild(Object.assign(EL('div','muted'),{textContent:'Nenhuma conversa ainda.',style:'padding:16px;font-size:13px;text-align:center'}));return;}
     arr.forEach(c=>{ const row=EL('div','warow'+(S.convSel&&(c.telefone||'').replace(/\D/g,'')===String(S.convSel).replace(/\D/g,'')?' on':''));
-      const av=EL('div');av.style.cssText='width:38px;height:38px;border-radius:50%;background:var(--goldsoft);color:var(--gold);font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto';av.textContent=(nomeDaConversa(c)[0]||'?').toUpperCase();
+      const av=avatarEl(c,38,false);
       const mid=EL('div');mid.style.cssText='flex:1 1 auto;min-width:0';
       const l1=EL('div');l1.style.cssText='display:flex;align-items:center;gap:6px';
       l1.appendChild(Object.assign(EL('div'),{textContent:nomeDaConversa(c),style:'font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto'}));
@@ -1425,7 +1443,7 @@ async function openConversa(telefone){
   const m=EL('div','modal big'); m.style.height='70vh'; m.style.display='flex'; m.style.flexDirection='column'; m.style.padding='0'; m.style.overflow='hidden';
   const ov=overlay(m);
   const el=await threadView(telefone,{closeOverlay:()=>ov.remove()});
-  m.appendChild(el);
+  m.appendChild(el); if(el._toBottom)el._toBottom();
 }
 async function openConectarWhats(){
   const m=EL('div','modal'); m.appendChild(EL('h3',null,'📱 Conectar WhatsApp'));
