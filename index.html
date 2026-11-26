@@ -117,6 +117,16 @@ button{font-family:inherit}
 .statcard .val{font-size:24px;font-weight:800;margin:4px 0 2px;letter-spacing:-.01em;line-height:1}
 .statcard .sub{font-size:11.5px;color:var(--muted)}
 .statcard.accent{border-color:var(--gold2)}.statcard.accent .val{color:var(--gold)}
+.cardtabs{display:flex;gap:3px;background:var(--surface2);border-radius:11px;padding:4px;margin:4px 0 14px}
+.cardtab{flex:1;padding:9px 6px;border:0;background:none;border-radius:8px;font-weight:600;font-size:13.5px;color:var(--muted);cursor:pointer;font-family:inherit;transition:.12s}
+.cardtab.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(40,28,20,.1)}
+.inforow{display:flex;justify-content:space-between;gap:12px;padding:10px 2px;border-bottom:1px solid var(--line);font-size:14px}
+.inforow .k{color:var(--muted)}.inforow .v{font-weight:600;text-align:right}
+.tl{position:relative;padding-left:20px;margin:2px 0}
+.tl::before{content:"";position:absolute;left:4px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--gold)}
+.tl::after{content:"";position:absolute;left:7.5px;top:14px;bottom:-10px;width:1.5px;background:var(--line)}
+.tl:last-child::after{display:none}
+.tl .tt{font-weight:600;font-size:14px}.tl .td{font-size:12px;color:var(--muted)}
 .iconbtn:active{transform:scale(.9)}
 .warow{transition:background .12s} .warow:active{background:var(--surface2)}
 .card:hover{transform:translateY(-1px);box-shadow:0 2px 4px rgba(51,44,35,.07),0 14px 32px rgba(51,44,35,.1)}
@@ -700,21 +710,43 @@ function openLead(id){
   head.appendChild(hi);
   const x=ibtn(ICON.back);x.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';x.onclick=()=>ov.remove();head.appendChild(x);
   m.appendChild(head);
-  // ações rápidas
-  const qa=EL('div');qa.style.cssText='display:flex;gap:8px;margin-bottom:16px';
-  if(telK){const ac=EL('button','btn','Abrir conversa');ac.style.flex='1';ac.onclick=()=>{ov.remove();S.convSel=l.telefone;S.tab='conversas';renderShell();render();};qa.appendChild(ac);}
-  const ed=EL('button','btn ghost','Editar dados');ed.onclick=()=>{ov.remove();openEditarCliente(id)};qa.appendChild(ed);
-  m.appendChild(qa);
-  m.appendChild(Object.assign(EL('div','eyebrow'),{textContent:'Etapa',style:'margin-bottom:6px'}));
-  const pills=EL('div','stagepills');
-  ETAPAS.forEach(e=>{const b=EL('button','sp'+(e.k===(l.etapa||'lead')?' on':''),e.l);b.onclick=async()=>{await move(l,e.k);ov.remove();openLead(id)};pills.appendChild(b)});
-  m.appendChild(pills);
-  if(l.retorno){m.appendChild(Object.assign(EL('div','muted'),{textContent:'Retorno marcado: '+brDate(l.retorno,{day:'2-digit',month:'2-digit',year:'numeric'}),style:'margin-top:10px;font-size:13px'}));}
-  if(l.proxima_acao)m.appendChild(Object.assign(EL('div','muted'),{textContent:'→ '+l.proxima_acao,style:'margin-top:5px;font-size:13px'}));
-  m.appendChild(servicosBloco(id,()=>ov.remove()));
-  const act=EL('div','mactions');
-  const ver=EL('button','btn ghost','Ver cadastro completo');ver.onclick=()=>{ov.remove();openCliente(clienteDoLead(id))};
-  act.appendChild(ver);m.appendChild(act);
+  // Agendar + conversa
+  const topact=EL('div');topact.style.cssText='display:flex;gap:8px;margin-bottom:12px';
+  const agb=EL('button','btn','Agendar');agb.style.flex='1';agb.onclick=()=>{ov.remove();openAgendamento(null,{lead_id:id,cliente_nome:l.nome,cliente_telefone:l.telefone});};topact.appendChild(agb);
+  if(telK){const ac=EL('button','btn ghost','Editar dados');ac.onclick=()=>{ov.remove();openEditarCliente(id)};topact.appendChild(ac);}
+  m.appendChild(topact);
+  // etapa (seletor compacto)
+  const etRow=EL('div');etRow.style.cssText='margin-bottom:14px;position:relative';
+  const curEt=ETAPAS.find(e=>e.k===(l.etapa||'lead'))||ETAPAS[0];
+  const etBtn=EL('button','btn ghost');etBtn.style.cssText='width:100%;display:flex;justify-content:space-between;align-items:center';
+  etBtn.innerHTML='<span class="muted" style="font-weight:600">Etapa</span><span style="font-weight:700">'+curEt.l+' ▾</span>';
+  etBtn.onclick=()=>{ const menu=EL('div');menu.style.cssText='position:absolute;left:0;right:0;top:48px;background:var(--surface);border:1px solid var(--line2);border-radius:12px;box-shadow:var(--shadow);z-index:5;overflow:hidden;max-height:50vh;overflow-y:auto';
+    ETAPAS.forEach(e=>{const r=EL('div');r.style.cssText='padding:12px 16px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--line)'+(e.k===curEt.k?';background:var(--goldsoft);font-weight:700':'');r.textContent=e.l;r.onclick=async()=>{await move(l,e.k);ov.remove();openLead(id);};menu.appendChild(r);});
+    etRow.appendChild(menu);const cl=(ev)=>{if(!menu.contains(ev.target)&&ev.target!==etBtn){menu.remove();document.removeEventListener('click',cl);}};setTimeout(()=>document.addEventListener('click',cl),0); };
+  etRow.appendChild(etBtn);m.appendChild(etRow);
+  // abas
+  const tb=EL('div','cardtabs'); const body=EL('div');
+  const TABS=['Resumo','Atividades','Conversa']; let active='Resumo';
+  const resumoView=()=>{ const d=EL('div');
+    [['Telefone',l.telefone?telLabel(l.telefone):'—'],['Nascimento',l.nascimento?brDate(l.nascimento,{day:'2-digit',month:'2-digit',year:'numeric'}):'—'],['Origem',l.origem||'—'],['Instagram',l.instagram||'—'],['Entrou',l.criado_em?brDate(l.criado_em,{day:'2-digit',month:'2-digit',year:'numeric'}):'—']].forEach(([k,v])=>{const r=EL('div','inforow');r.innerHTML='<span class="k"></span><span class="v"></span>';r.querySelector('.k').textContent=k;r.querySelector('.v').textContent=v;d.appendChild(r);});
+    if(l.obs){const o=EL('div');o.style.marginTop='12px';o.innerHTML='<div class="eyebrow" style="margin-bottom:4px">Observações</div>';o.appendChild(Object.assign(EL('div'),{textContent:l.obs,style:'font-size:14px'}));d.appendChild(o);}
+    if(l.proxima_acao)d.appendChild(Object.assign(EL('div','muted'),{textContent:'→ '+l.proxima_acao,style:'margin-top:10px;font-size:13px'}));
+    d.appendChild(servicosBloco(id,()=>ov.remove())); return d; };
+  const atividadesView=()=>{ const d=EL('div'); const items=[];
+    servicosDoLead(id).forEach(a=>{const sv=servById(a.servico_id),pro=proById(a.profissional_id);const dt=a.realizado_em||a.inicio;const st=a.status==='realizado'?'Realizou':(a.status==='faltou'?'Faltou':'Agendado');items.push({dt,tt:st+' · '+(sv.nome||'serviço'),td:[pro.nome,dt?brDate(dt,{day:'2-digit',month:'2-digit'})+' '+hhmm(new Date(dt)):''].filter(Boolean).join(' · ')});});
+    if(l.retorno)items.push({dt:l.retorno,tt:'Retorno marcado',td:brDate(l.retorno,{day:'2-digit',month:'2-digit',year:'numeric'})});
+    const conv=(S.conversas||[]).find(c=>(c.telefone||'').replace(/\D/g,'')===telK); if(conv&&conv.ultima_em)items.push({dt:conv.ultima_em,tt:'Última mensagem',td:(conv.ultima_msg||'').slice(0,40)});
+    if(l.criado_em)items.push({dt:l.criado_em,tt:'Entrou no funil'+(l.origem?' · '+l.origem:''),td:brDate(l.criado_em,{day:'2-digit',month:'2-digit',year:'numeric'})});
+    items.sort((a,b)=>new Date(b.dt||0)-new Date(a.dt||0));
+    if(!items.length)d.appendChild(Object.assign(EL('div','muted'),{textContent:'Sem atividades ainda.',style:'padding:16px;text-align:center'}));
+    items.forEach(it=>{const t=EL('div','tl');t.innerHTML='<div class="tt"></div><div class="td"></div>';t.querySelector('.tt').textContent=it.tt;t.querySelector('.td').textContent=it.td;d.appendChild(t);}); return d; };
+  const conversaView=()=>{ const d=EL('div');d.style.cssText='height:56vh;display:flex;flex-direction:column;margin:0 -6px';
+    if(!telK){d.appendChild(Object.assign(EL('div','muted'),{textContent:'Sem telefone pra conversar.',style:'padding:20px;text-align:center'}));return d;}
+    d.appendChild(Object.assign(EL('div','muted'),{textContent:'Carregando conversa…',style:'margin:auto'}));
+    threadView(l.telefone,{closeOverlay:()=>ov.remove()}).then(el=>{el.style.height='100%';el.style.flex='1 1 0';el.style.minHeight='0';d.innerHTML='';d.appendChild(el);if(el._toBottom)el._toBottom();}); return d; };
+  const views={Resumo:resumoView,Atividades:atividadesView,Conversa:conversaView};
+  const paint=()=>{ tb.innerHTML=''; TABS.forEach(t=>{const b=EL('button','cardtab'+(t===active?' on':''),t);b.onclick=()=>{active=t;paint();};tb.appendChild(b);}); body.innerHTML=''; body.appendChild(views[active]()); };
+  m.appendChild(tb); m.appendChild(body); paint();
   const ov=overlay(m);
 }
 // ficha de edicao de dados da cliente
