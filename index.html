@@ -497,11 +497,11 @@ function soon(t,d){const w=EL('div');w.appendChild(pageHead(t));const s=EL('div'
 // ---------- FUNIL ----------
 function diasSemResposta(l){ const k=(l.telefone||'').replace(/\D/g,''); const c=k&&(S.conversas||[]).find(x=>(x.telefone||'').replace(/\D/g,'')===k); const base=c&&c.ultima_em?new Date(c.ultima_em):(l.atualizado_em?new Date(l.atualizado_em):null); if(!base)return -1; return Math.floor((Date.now()-base.getTime())/864e5); }
 function diasDesdeVisita(l){ return l.realizado_em?Math.floor((Date.now()-new Date(l.realizado_em))/864e5):-1; }
-// cliente que fez procedimento, sem retorno marcado: amarelo 20-39 dias, vermelho 40+
-function atencaoBucket(l){ if(l.etapa==='realizou' && !l.retorno && l.realizado_em){ const d=diasDesdeVisita(l); if(d>=40)return 'vermelho'; if(d>=20)return 'amarelo'; } return null; }
+// cliente que fez procedimento, sem retorno marcado: amarelo 10-19 dias, vermelho 20+ dias sem ir ao estúdio
+function atencaoBucket(l){ if(l.etapa==='realizou' && !l.retorno && l.realizado_em){ const d=diasDesdeVisita(l); if(d>=20)return 'vermelho'; if(d>=10)return 'amarelo'; } return null; }
 function leadAlert(l){
   if(l.etapa==='retorno' && l.retorno){const dd=Math.ceil((new Date(l.retorno+'T00:00:00')-new Date())/864e5); if(dd<=0)return{cls:'al',txt:'retorno atrasado'}; if(dd<=7)return{cls:'wn',txt:'retorno em '+dd+'d'};}
-  if(l.etapa==='realizou' && !l.retorno && l.realizado_em){const dias=Math.floor((new Date()-new Date(l.realizado_em))/864e5); if(dias>=40)return{cls:'al',txt:dias+' dias parada'}; if(dias>=20)return{cls:'wn',txt:dias+' dias parada'};}
+  if(l.etapa==='realizou' && !l.retorno && l.realizado_em){const dias=Math.floor((new Date()-new Date(l.realizado_em))/864e5); if(dias>=20)return{cls:'al',txt:dias+' dias sem ir'}; if(dias>=10)return{cls:'wn',txt:dias+' dias sem ir'};}
   if(l.proxima_acao_em && new Date(l.proxima_acao_em)<new Date()) return {cls:'al',txt:'atrasado'};
   if(l.etapa==='conversa' && !l.proxima_acao_em) return {cls:'wn',txt:'responder'};
   return null;
@@ -534,14 +534,14 @@ function viewFunil(){
   };
   sbx.appendChild(si); sbx.appendChild(results); w.appendChild(sbx);
   // alertas no topo — SÓ aparecem quando têm gente (chegou no estágio)
-  const semResp=S.leads.filter(l=>l.etapa==='conversa'||l.etapa==='followup');
-  const amarelo=S.leads.filter(l=>atencaoBucket(l)==='amarelo');
-  const vermelho=S.leads.filter(l=>atencaoBucket(l)==='vermelho');
+  const reativar=S.leads.filter(l=>l.etapa==='followup');  // 1º contato, nunca agendou, sumiu -> reativar
+  const amarelo=S.leads.filter(l=>atencaoBucket(l)==='amarelo');   // já realizou, 10-19 dias sem ir
+  const vermelho=S.leads.filter(l=>atencaoBucket(l)==='vermelho'); // já realizou, 20+ dias sem ir
   const setF=(k)=>()=>{ S.funilFiltro=(S.funilFiltro===k)?null:k; render(); };
   const cats=[
-    {key:'vermelho',label:'40+ dias sem vir',n:vermelho.length,cls:'red',ic:ICON.alert},
-    {key:'amarelo',label:'20+ dias sem vir',n:amarelo.length,cls:'yel',ic:ICON.clock},
-    {key:'semresposta',label:'Sem resposta',n:semResp.length,cls:'gold',ic:ICON.chat}
+    {key:'vermelho',label:'20+ dias sem ir',n:vermelho.length,cls:'red',ic:ICON.alert},
+    {key:'amarelo',label:'10+ dias sem ir',n:amarelo.length,cls:'yel',ic:ICON.clock},
+    {key:'reativar',label:'Follow-up (reativar)',n:reativar.length,cls:'gold',ic:ICON.chat}
   ].filter(c=>c.n>0);
   if(cats.length||S.funilFiltro){
     const ach=EL('div','achips');
@@ -550,11 +550,11 @@ function viewFunil(){
     w.appendChild(ach);
   }
   // visão filtrada por categoria
-  if(S.funilFiltro&&['semresposta','amarelo','vermelho'].includes(S.funilFiltro)){
+  if(S.funilFiltro&&['reativar','amarelo','vermelho'].includes(S.funilFiltro)){
     const cfg={
-      semresposta:{list:semResp.slice().sort((a,b)=>diasSemResposta(b)-diasSemResposta(a)),title:'Sem resposta no WhatsApp',desc:'Em conversa ou follow-up · mais dias sem resposta no topo.'},
-      amarelo:{list:amarelo.slice().sort((a,b)=>diasDesdeVisita(b)-diasDesdeVisita(a)),title:'20+ dias sem vir ao estúdio',desc:'Fizeram procedimento, sem retorno marcado, há 20 a 40 dias.'},
-      vermelho:{list:vermelho.slice().sort((a,b)=>diasDesdeVisita(b)-diasDesdeVisita(a)),title:'40+ dias sem vir ao estúdio',desc:'Fizeram procedimento, sem retorno marcado, há mais de 40 dias.'}
+      reativar:{list:reativar.slice().sort((a,b)=>diasSemResposta(b)-diasSemResposta(a)),title:'Follow-up — reativar',desc:'Tiveram 1º contato, nunca agendaram e sumiram · mais dias sem resposta no topo.'},
+      amarelo:{list:amarelo.slice().sort((a,b)=>diasDesdeVisita(b)-diasDesdeVisita(a)),title:'10+ dias sem ir ao estúdio',desc:'Já fizeram procedimento, sem retorno marcado, há 10 a 19 dias.'},
+      vermelho:{list:vermelho.slice().sort((a,b)=>diasDesdeVisita(b)-diasDesdeVisita(a)),title:'20+ dias sem ir ao estúdio',desc:'Já fizeram procedimento, sem retorno marcado, há 20 dias ou mais.'}
     }[S.funilFiltro];
     const hd=EL('div');hd.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px';
     hd.appendChild(Object.assign(EL('div'),{textContent:cfg.title+' ('+cfg.list.length+')',style:'font-weight:800;font-size:17px'}));
@@ -640,7 +640,7 @@ function cardLead(l){
   if(l.origem) tags.appendChild(EL('span','tag org',l.origem));
   const al=leadAlert(l); if(al) tags.appendChild(EL('span','tag '+al.cls,al.txt));
   if(l.retorno){const dd=Math.ceil((new Date(l.retorno)-new Date())/864e5);if(dd<=7)tags.appendChild(EL('span','tag wn',dd<=0?'retorno hoje':'retorno '+dd+'d'));}
-  if((l.etapa||'')==='followup'||(l.etapa||'')==='conversa'){ const _d=diasSemResposta(l); if(_d>=0){ tags.appendChild(EL('span','tag '+(_d>=20?'al':'wn'),(_d<=0?'hoje':_d+'d sem resposta'))); } }
+  if((l.etapa||'')==='followup'){ const _d=diasSemResposta(l); if(_d>=0){ tags.appendChild(EL('span','tag '+(_d>=20?'al':'wn'),(_d<=0?'hoje':_d+'d sem resposta'))); } }
   const bd=bdayInfo(l.nascimento);
   if(bd){
     if(bd.today){tags.appendChild(EL('span','tag money','🎂 aniversário hoje'));c.style.background='var(--goldsoft)';}
