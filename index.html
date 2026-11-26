@@ -125,12 +125,18 @@ button{cursor:pointer}
 .wachat .wafoot{padding:10px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:flex-end}
 .waback{display:none}
 @media(max-width:720px){
-  .walayout{height:74vh}
+  /* lista em tela cheia, sem cara de caixinha */
+  .walayout{height:calc(100vh - 150px);min-height:420px;margin-top:8px;border-radius:12px}
   .walist{width:100%;flex:1 1 auto;border-right:0}
   .wachat{display:none}
   .waback{display:inline-flex}
   .walayout.showchat .walist{display:none}
   .walayout.showchat .wachat{display:flex}
+  /* ao abrir a conversa: TELA CHEIA, igual WhatsApp do celular */
+  .walayout.showchat{position:fixed;inset:0;height:100%;width:100%;margin:0;border:0;border-radius:0;z-index:60}
+  .walayout.showchat .wahead{position:sticky;top:0;z-index:2;background:var(--surface);padding-top:calc(11px + env(safe-area-inset-top,0px))}
+  .walayout.showchat .wafoot{padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+  .walayout.showchat .wachat,.walayout.showchat .wabody{min-height:0}
 }
 .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
 .tag{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;letter-spacing:.02em}
