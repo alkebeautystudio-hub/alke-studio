@@ -1675,6 +1675,15 @@ async function threadView(telefone, opts){
   wrap._toBottom=()=>{requestAnimationFrame(()=>{body.scrollTop=body.scrollHeight;});};
   try{ await sb.from('conversas').update({nao_lidas:0}).eq('telefone',telefone); const cc=(S.conversas||[]).find(x=>x.telefone===telefone); if(cc)cc.nao_lidas=0; }catch(_){}
   await loadMsgs();
+  // TEMPO REAL: nova mensagem (recebida ou enviada de qualquer telefone/sistema) aparece na hora
+  try{
+    const chan=sb.channel('msgs-'+tel+'-'+Date.now())
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'mensagens',filter:'telefone=eq.'+tel},()=>{
+        const b=wrap.querySelector('.wabody'); const perto = b ? (b.scrollHeight-b.scrollTop-b.clientHeight < 120) : true;
+        loadMsgs().then(()=>{ if(perto&&wrap._toBottom)wrap._toBottom(); });
+      }).subscribe();
+    try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(wrap)){ try{sb.removeChannel(chan);}catch(_){} mo.disconnect(); } }); mo.observe(document.body,{childList:true,subtree:true}); }catch(_){}
+  }catch(_){}
   const foot=EL('div','wafoot');
   const prov=()=>(S.me&&S.me.nome)||null;
   const fileToData=(file)=>new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file);});
@@ -1771,6 +1780,14 @@ function viewConversas(){
   search.oninput=drawRows;
   layout.appendChild(left); layout.appendChild(right); w.appendChild(layout);
   if(S.convSel) openIn(S.convSel); else showEmpty();
+  // TEMPO REAL: lista atualiza sozinha (nova msg, contagem, última mensagem)
+  try{
+    const chan=sb.channel('convs-'+Date.now())
+      .on('postgres_changes',{event:'*',schema:'public',table:'conversas'},()=>{
+        sb.from('conversas').select('*').order('ultima_em',{ascending:false}).then(({data})=>{ if(data){S.conversas=data;drawRows();try{renderShell();}catch(_){}} });
+      }).subscribe();
+    try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(w)){ try{sb.removeChannel(chan);}catch(_){} mo.disconnect(); } }); mo.observe(document.body,{childList:true,subtree:true}); }catch(_){}
+  }catch(_){}
   return w;
 }
 async function openConversa(telefone){
