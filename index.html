@@ -1362,13 +1362,37 @@ function avatarEl(c,size,fetchAvatar){ size=size||38;
   return d;
 }
 function midiaLabel(tipo,texto){ const m={image:'📷 Foto',audio:'🎤 Áudio',ptt:'🎤 Áudio',video:'🎥 Vídeo',sticker:'🩷 Figurinha',location:'📍 Localização',doc:'📄 '+(texto&&texto[0]!=='['?texto:'Documento'),document:'📄 '+(texto&&texto[0]!=='['?texto:'Documento')}; return m[tipo]||null; }
+function stripBucket(u){ return u?u.replace('/kairo-fzap-media-buffer/','/'):u; }
+async function resolveMedia(mm){ if(mm.midia_url)return stripBucket(mm.midia_url); if(!mm.wa_id)return null; const r=await fzapCall('media',{id:mm.wa_id}); if(r&&r.url){mm.midia_url=r.url;return stripBucket(r.url);} return null; }
+// monta a mídia dentro da bolha. io = IntersectionObserver pra carregar imagem só quando aparece
+function buildMedia(mm,io){
+  const tp=mm.tipo, img=(tp==='image'||tp==='sticker'), size=tp==='sticker'?120:200;
+  const wrap=EL('div');
+  if(img){
+    const ph=EL('div');ph.style.cssText='min-width:140px;min-height:90px;max-width:230px;border-radius:9px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;cursor:pointer';ph.textContent=tp==='sticker'?'🩷 Figurinha':'📷 Foto';
+    ph._load=async()=>{ ph.textContent='carregando…'; const url=await resolveMedia(mm); if(!url){ph.textContent=(tp==='sticker'?'🩷 Figurinha':'📷 Foto')+' (indisponível)';return;} const im=document.createElement('img');im.src=url;im.style.cssText='max-width:230px;max-height:260px;border-radius:9px;display:block';im.onclick=()=>window.open(url,'_blank');im.onerror=()=>{ph.textContent='📷 Foto (indisponível)';}; ph.replaceWith(im); };
+    if(io)io.observe(ph); else setTimeout(()=>ph._load(),0);
+    wrap.appendChild(ph);
+  } else if(tp==='audio'||tp==='ptt'){
+    const btn=EL('button','btn ghost sm','🎤 Ouvir áudio');btn.onclick=async()=>{ btn.textContent='carregando…'; const url=await resolveMedia(mm); if(!url){btn.textContent='🎤 Áudio (indisponível)';btn.disabled=true;return;} const au=document.createElement('audio');au.controls=true;au.autoplay=true;au.src=url;au.style.cssText='max-width:230px;height:40px'; btn.replaceWith(au); };
+    wrap.appendChild(btn);
+  } else if(tp==='video'){
+    const btn=EL('button','btn ghost sm','🎥 Ver vídeo');btn.onclick=async()=>{ btn.textContent='carregando…'; const url=await resolveMedia(mm); if(!url){btn.textContent='🎥 Vídeo (indisponível)';btn.disabled=true;return;} const vd=document.createElement('video');vd.controls=true;vd.src=url;vd.style.cssText='max-width:230px;max-height:280px;border-radius:9px'; btn.replaceWith(vd); };
+    wrap.appendChild(btn);
+  } else { // documento
+    const nome=(mm.texto&&mm.texto[0]!=='[')?mm.texto:'Documento';
+    const btn=EL('button','btn ghost sm','📄 '+nome);btn.onclick=async()=>{ btn.textContent='abrindo…'; const url=await resolveMedia(mm); if(!url){btn.textContent='📄 '+nome+' (indisponível)';btn.disabled=true;return;} window.open(url,'_blank'); btn.textContent='📄 '+nome; };
+    wrap.appendChild(btn);
+  }
+  return wrap;
+}
 // painel da conversa (thread + responder), reaproveitado no 2-colunas e no modal da cliente
 async function threadView(telefone, opts){
   opts=opts||{}; const tel=String(telefone||'').replace(/\D/g,'');
   const c=(S.conversas||[]).find(x=>(x.telefone||'').replace(/\D/g,'')===tel)||{telefone:tel};
   const wrap=EL('div'); wrap.style.cssText='display:flex;flex-direction:column;height:100%;min-height:0';
   const head=EL('div','wahead');
-  if(opts.onBack){const bk=EL('button','btn ghost sm waback','‹');bk.onclick=opts.onBack;head.appendChild(bk);}
+  if(opts.onBack){const bk=EL('button','btn ghost sm'+(opts.alwaysBack?'':' waback'),opts.alwaysBack?'‹ Voltar':'‹');bk.onclick=opts.onBack;head.appendChild(bk);}
   head.appendChild(avatarEl(c,40,true));
   const hi=EL('div');hi.style.minWidth='0';
   hi.appendChild(Object.assign(EL('div'),{textContent:nomeDaConversa(c),style:'font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
@@ -1380,13 +1404,14 @@ async function threadView(telefone, opts){
   if(lead){const vb=EL('button','btn ghost sm','Ver card');vb.onclick=()=>{ if(opts.closeOverlay)opts.closeOverlay(); openLead(lead.id); };head.appendChild(vb);}
   wrap.appendChild(head);
   const body=EL('div','wabody'); body.appendChild(Object.assign(EL('div','muted'),{textContent:'Carregando…',style:'text-align:center;padding:10px;font-size:13px'})); wrap.appendChild(body);
+  const MIDIAS=['image','sticker','video','audio','ptt','document','doc'];
   const loadMsgs=async()=>{ const {data}=await sb.from('mensagens').select('*').eq('telefone',tel).order('criado_em',{ascending:true});
     body.innerHTML='';
+    let io=null; try{ io=new IntersectionObserver((ents)=>{ents.forEach(e=>{if(e.isIntersecting){io.unobserve(e.target);e.target._load&&e.target._load();}});},{root:body,rootMargin:'300px'}); }catch(_){}
     (data||[]).forEach(mm=>{ const b=EL('div');const mine=mm.direcao==='out';
       b.style.cssText='max-width:76%;padding:8px 11px;border-radius:12px;font-size:14px;white-space:pre-wrap;word-break:break-word;'+(mine?'align-self:flex-end;background:color-mix(in srgb,var(--gold) 22%,var(--surface))':'align-self:flex-start;background:var(--surface);border:1px solid var(--line)');
-      const ml=midiaLabel(mm.tipo,mm.texto);
-      if(ml){ const mi=EL('div');mi.textContent=ml;mi.style.cssText='font-style:italic;color:var(--muted)';b.appendChild(mi); }
-      else { b.appendChild(document.createTextNode(mm.texto||'')); }
+      if(MIDIAS.includes(mm.tipo)){ b.appendChild(buildMedia(mm,io)); if(mm.texto&&mm.texto[0]!=='['&&mm.tipo!=='document'&&mm.tipo!=='doc'){ b.appendChild(Object.assign(EL('div'),{textContent:mm.texto,style:'margin-top:4px'})); } }
+      else { const ml=midiaLabel(mm.tipo,mm.texto); if(ml){const mi=EL('div');mi.textContent=ml;mi.style.cssText='font-style:italic;color:var(--muted)';b.appendChild(mi);} else b.appendChild(document.createTextNode(mm.texto||'')); }
       const tm=EL('div');tm.style.cssText='font-size:10px;color:var(--muted);margin-top:2px;text-align:right';tm.textContent=mm.criado_em?hhmm(new Date(mm.criado_em)):'';
       b.appendChild(tm); body.appendChild(b);
     });
@@ -1440,9 +1465,10 @@ function viewConversas(){
   return w;
 }
 async function openConversa(telefone){
-  const m=EL('div','modal big'); m.style.height='70vh'; m.style.display='flex'; m.style.flexDirection='column'; m.style.padding='0'; m.style.overflow='hidden';
+  const m=EL('div','modal big'); m.style.height='min(80vh,640px)'; m.style.display='flex'; m.style.flexDirection='column'; m.style.padding='0'; m.style.overflow='hidden';
   const ov=overlay(m);
-  const el=await threadView(telefone,{closeOverlay:()=>ov.remove()});
+  const el=await threadView(telefone,{onBack:()=>ov.remove(),alwaysBack:true,closeOverlay:()=>ov.remove()});
+  el.style.flex='1 1 auto'; el.style.minHeight='0';
   m.appendChild(el); if(el._toBottom)el._toBottom();
 }
 async function openConectarWhats(){
