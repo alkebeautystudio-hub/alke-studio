@@ -124,7 +124,7 @@ button{cursor:pointer}
 .wachat{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;min-height:0}
 .wachat .wahead{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .wachat .wabody{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;flex-direction:column;gap:7px;padding:12px;background:var(--bg)}
-body.scroll-locked{position:fixed;left:0;right:0;width:100%;overflow:hidden}
+body.scroll-locked{overflow:hidden}
 .wachat .wafoot{padding:10px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:flex-end}
 .waback{display:none}
 @media(max-width:720px){
@@ -1476,27 +1476,34 @@ function viewConversas(){
 }
 async function openConversa(telefone){
   const mobile=window.matchMedia&&window.matchMedia('(max-width:720px)').matches;
-  const m=EL('div','modal big');
-  if(mobile){ m.style.cssText='position:fixed;left:0;top:0;width:100%;max-width:none;height:100%;margin:0;border:0;border-radius:0;padding:0;display:flex;flex-direction:column;overflow:hidden;background:var(--surface)'; }
-  else { m.style.height='min(80vh,640px)'; m.style.display='flex'; m.style.flexDirection='column'; m.style.padding='0'; m.style.overflow='hidden'; }
+  if(mobile){
+    // painel de tela cheia DIRETO no body (sem overlay/.ov) pra NAO ligar o scroll-lock — rola nativo igual a aba Conversas
+    const panel=EL('div'); panel.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;z-index:60;background:var(--surface);display:flex;flex-direction:column;overflow:hidden';
+    document.body.appendChild(panel);
+    const close=()=>{ panel.remove(); };
+    const el=await threadView(telefone,{onBack:close,alwaysBack:true,closeOverlay:close});
+    el.style.height='100%'; el.style.minHeight='0'; el.style.flex='1 1 0';
+    const head=el.firstChild, foot=el.lastChild;
+    if(head&&head.style){head.style.paddingTop='calc(11px + env(safe-area-inset-top,0px))';}
+    if(foot&&foot.style){foot.style.paddingBottom='calc(10px + env(safe-area-inset-bottom,0px))';}
+    panel.appendChild(el); if(el._toBottom)el._toBottom();
+    bindKeyboard(panel);
+    return;
+  }
+  // PC: pop-up centralizado
+  const m=EL('div','modal big'); m.style.height='min(80vh,640px)'; m.style.display='flex'; m.style.flexDirection='column'; m.style.padding='0'; m.style.overflow='hidden';
   const ov=overlay(m);
-  if(mobile) ov.style.padding='0';
   const el=await threadView(telefone,{onBack:()=>ov.remove(),alwaysBack:true,closeOverlay:()=>ov.remove()});
   el.style.height='100%'; el.style.minHeight='0'; el.style.flex='1 1 0';
-  if(mobile){ const head=el.firstChild, foot=el.lastChild;
-    if(head&&head.style){head.style.paddingTop='calc(11px + env(safe-area-inset-top,0px))';head.style.position='sticky';head.style.top='0';head.style.background='var(--surface)';head.style.zIndex='2';}
-    if(foot&&foot.style){foot.style.paddingBottom='calc(10px + env(safe-area-inset-bottom,0px))';}
-    bindKeyboard(m,ov);
-  }
   m.appendChild(el); if(el._toBottom)el._toBottom();
 }
-// no celular, acompanha o teclado (VisualViewport) pra o campo de digitar ficar sempre visível
-function bindKeyboard(m,ov){
+// no celular, acompanha o teclado (VisualViewport) pra o campo de digitar ficar sempre visível acima do teclado
+function bindKeyboard(node){
   if(!window.visualViewport) return;
   const vv=window.visualViewport;
-  const fit=()=>{ m.style.height=vv.height+'px'; m.style.top=(vv.offsetTop||0)+'px'; };
+  const fit=()=>{ node.style.height=vv.height+'px'; node.style.bottom='auto'; node.style.top=(vv.offsetTop||0)+'px'; };
   vv.addEventListener('resize',fit); vv.addEventListener('scroll',fit); fit();
-  try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(ov)){vv.removeEventListener('resize',fit);vv.removeEventListener('scroll',fit);mo.disconnect();} }); mo.observe(document.body,{childList:true}); }catch(_){}
+  try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(node)){vv.removeEventListener('resize',fit);vv.removeEventListener('scroll',fit);mo.disconnect();} }); mo.observe(document.body,{childList:true}); }catch(_){}
 }
 async function openConectarWhats(){
   const m=EL('div','modal'); m.appendChild(EL('h3',null,'📱 Conectar WhatsApp'));
@@ -1750,10 +1757,7 @@ function minhaConta(){
 function inp(type,val,ph){const i=document.createElement('input');i.type=type;if(val!=null)i.value=val;if(ph)i.placeholder=ph;return i}
 function sel(opts,val,ph){const s=document.createElement('select');if(ph)s.appendChild(new Option(ph,''));opts.forEach(([v,l])=>s.appendChild(new Option(l,v)));if(val!=null)s.value=val;return s}
 function field(label,node){const f=EL('div','f');f.appendChild(EL('label',null,label));f.appendChild(node);return f}
-let _lockY=0;
-function syncScrollLock(){ const open=!!document.querySelector('.ov'); const b=document.body; const locked=b.classList.contains('scroll-locked');
-  if(open&&!locked){ _lockY=window.scrollY||window.pageYOffset||0; b.style.top=(-_lockY)+'px'; b.classList.add('scroll-locked'); }
-  else if(!open&&locked){ b.classList.remove('scroll-locked'); b.style.top=''; window.scrollTo(0,_lockY); } }
+function syncScrollLock(){ document.body.classList.toggle('scroll-locked',!!document.querySelector('.ov')); }
 try{ new MutationObserver(syncScrollLock).observe(document.body,{childList:true}); }catch(_){}
 function overlay(node){const ov=EL('div','ov');ov.onclick=e=>{if(e.target===ov)ov.remove()};ov.appendChild(node);document.body.appendChild(ov);syncScrollLock();return ov}
 
