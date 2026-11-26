@@ -481,6 +481,7 @@ function pageHead(title,sub){
 function soon(t,d){const w=EL('div');w.appendChild(pageHead(t));const s=EL('div','soon');s.appendChild(EL('div','big','Em breve'));s.appendChild(EL('div',null,d));w.appendChild(s);return w}
 
 // ---------- FUNIL ----------
+function diasSemResposta(l){ const k=(l.telefone||'').replace(/\D/g,''); const c=k&&(S.conversas||[]).find(x=>(x.telefone||'').replace(/\D/g,'')===k); const base=c&&c.ultima_em?new Date(c.ultima_em):(l.atualizado_em?new Date(l.atualizado_em):null); if(!base)return -1; return Math.floor((Date.now()-base.getTime())/864e5); }
 function leadAlert(l){
   if(l.etapa==='retorno' && l.retorno){const dd=Math.ceil((new Date(l.retorno+'T00:00:00')-new Date())/864e5); if(dd<=0)return{cls:'al',txt:'retorno atrasado'}; if(dd<=7)return{cls:'wn',txt:'retorno em '+dd+'d'};}
   if(l.etapa==='realizou' && !l.retorno && l.realizado_em){const dias=Math.floor((new Date()-new Date(l.realizado_em))/864e5); if(dias>=40)return{cls:'al',txt:dias+' dias parada'}; if(dias>=20)return{cls:'wn',txt:dias+' dias parada'};}
@@ -517,11 +518,26 @@ function viewFunil(){
   sbx.appendChild(si); sbx.appendChild(results); w.appendChild(sbx);
   // stats
   const ks=EL('div','kstats');
-  const atr=S.leads.filter(l=>leadAlert(l)).length;
+  const alerts=S.leads.filter(l=>leadAlert(l)).map(l=>({l,a:leadAlert(l)}));
+  const nRed=alerts.filter(x=>x.a.cls==='al').length, nYel=alerts.filter(x=>x.a.cls==='wn').length;
   ks.appendChild(statPill('No funil',S.leads.filter(l=>!['realizou','naoveio'].includes(l.etapa)).length));
-  ks.appendChild(statPill('Precisam de ação',atr,'var(--alert)'));
+  ks.appendChild(statPill(S.funilAtencao?'← Ver tudo':'Precisam de atenção',alerts.length,'var(--alert)',()=>{S.funilAtencao=!S.funilAtencao;render();}));
   ks.appendChild(statPill('Agendadas',S.leads.filter(l=>l.etapa==='agendada').length,'var(--gold)'));
   w.appendChild(ks);
+  // visão "precisam de atenção" (clicou no card de cima) — mostra só quem precisa + o motivo
+  if(S.funilAtencao){
+    const sev=x=>x.a.cls==='al'?0:1;
+    alerts.sort((x,y)=> sev(x)-sev(y) || (diasSemResposta(y.l)-diasSemResposta(x.l)));
+    const hd=EL('div');hd.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px';
+    hd.appendChild(Object.assign(EL('div'),{textContent:'Precisam de atenção ('+alerts.length+')',style:'font-weight:800;font-size:17px'}));
+    const volta=EL('button','btn ghost sm','Ver funil');volta.onclick=()=>{S.funilAtencao=false;render();};hd.appendChild(volta);
+    w.appendChild(hd);
+    w.appendChild(Object.assign(EL('div','muted'),{innerHTML:'<b style="color:var(--alert)">'+nRed+' urgente(s)</b> (vermelho: +40 dias / retorno atrasado) · <b style="color:var(--warn)">'+nYel+' em alerta</b> (amarelo: +20 dias / responder)',style:'font-size:12.5px;margin:6px 0 12px'}));
+    const list=EL('div');list.style.cssText='display:flex;flex-direction:column;gap:10px';
+    if(!alerts.length)list.appendChild(Object.assign(EL('div','muted'),{textContent:'Tudo em dia! Ninguém precisa de ação agora. 🎉',style:'padding:24px;text-align:center'}));
+    alerts.forEach(x=>list.appendChild(cardLead(x.l)));
+    w.appendChild(list); return w;
+  }
   const mobile=window.matchMedia&&window.matchMedia('(max-width:720px)').matches;
   if(mobile){
     if(!S.funilEtapa||!ETAPAS.some(e=>e.k===S.funilEtapa)) S.funilEtapa='conversa';
@@ -529,6 +545,7 @@ function viewFunil(){
     const cur=ETAPAS[idx];
     const curItems=S.leads.filter(l=>(l.etapa||'lead')===cur.k);
     if(cur.k==='retorno') curItems.sort((a,b)=>(a.retorno||'9999-99-99').localeCompare(b.retorno||'9999-99-99'));
+    if(cur.k==='followup') curItems.sort((a,b)=>diasSemResposta(b)-diasSemResposta(a)); // mais dias sem resposta no topo
     const selRow=EL('div');selRow.style.cssText='display:flex;align-items:center;gap:8px;margin-top:12px;position:relative';
     const prev=EL('button','btn ghost sm','‹');prev.style.flex='0 0 auto';prev.onclick=()=>{S.funilEtapa=ETAPAS[(idx-1+ETAPAS.length)%ETAPAS.length].k;render();};
     const next=EL('button','btn ghost sm','›');next.style.flex='0 0 auto';next.onclick=()=>{S.funilEtapa=ETAPAS[(idx+1)%ETAPAS.length].k;render();};
@@ -552,6 +569,7 @@ function viewFunil(){
     col.ondrop=ev=>{ev.preventDefault();col.classList.remove('drop');const id=ev.dataTransfer.getData('text/plain');const ld=S.leads.find(x=>x.id===id);if(ld&&ld.etapa!==e.k)move(ld,e.k)};
     const items=S.leads.filter(l=>(l.etapa||'lead')===e.k);
     if(e.k==='retorno') items.sort((a,b)=>(a.retorno||'9999-99-99').localeCompare(b.retorno||'9999-99-99')); // mais perto da data no topo
+    if(e.k==='followup') items.sort((a,b)=>diasSemResposta(b)-diasSemResposta(a)); // mais dias sem resposta no topo
     const h=EL('div','colh'); h.appendChild(EL('b',null,e.l)); h.appendChild(EL('span','pill',String(items.length))); col.appendChild(h);
     const cc=EL('div','cards');
     items.forEach(l=>cc.appendChild(cardLead(l)));
@@ -559,7 +577,7 @@ function viewFunil(){
   });
   w.appendChild(board); return w;
 }
-function statPill(label,n,color){const p=EL('div','kstat');const d=EL('span','d');d.style.background=color||'var(--muted)';p.appendChild(d);p.appendChild(EL('b',null,String(n)));p.appendChild(EL('span','muted',label));return p}
+function statPill(label,n,color,onClick){const p=EL('div','kstat');if(onClick){p.style.cursor='pointer';p.onclick=onClick;}const d=EL('span','d');d.style.background=color||'var(--muted)';p.appendChild(d);p.appendChild(EL('b',null,String(n)));p.appendChild(EL('span','muted',label));return p}
 function cardLead(l){
   const servs=servicosDoLead(l.id);
   const firstPro=proById((servs[0]||{}).profissional_id);
@@ -1273,6 +1291,8 @@ function openAgendamento(ag,prefill){
       else{const {data:ins}=await sb.from('leads').insert({nome:nome.value.trim()||'Cliente',telefone:tel.value.trim()||null,etapa:'agendada',criado_em:new Date().toISOString(),atualizado_em:new Date().toISOString()}).select().single();leadId=ins?.id;}
     }
     if(leadId) row.lead_id=leadId;
+    // ao agendar com um nome, o card pega esse nome — só se ainda for "Cliente XXXX"/vazio e sem cadastro (o cadastro validado vale no final)
+    if(leadId && nome.value.trim()){ const ld=S.leads.find(x=>x.id===leadId); if(ld && !ld.cadastro_completo && (!ld.nome || /^Cliente \d{4}$/.test(ld.nome))){ try{ await sb.from('leads').update({nome:nome.value.trim()}).eq('id',leadId); const k=(ld.telefone||'').replace(/\D/g,''); if(k)await sb.from('conversas').update({nome:nome.value.trim()}).eq('telefone',k); }catch(_){} } }
     let agId=isEdit?ag.id:null, gid=isEdit?ag.google_event_id:null;
     if(isEdit){ await sb.from('agendamentos').update(row).eq('id',ag.id); }
     else { const {data:ins}=await sb.from('agendamentos').insert(row).select().single(); agId=ins&&ins.id; }
