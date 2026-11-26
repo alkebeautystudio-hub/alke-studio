@@ -223,7 +223,7 @@ const sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const fmt=v=>BRL.format(Number(v)||0);
 const EL=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
-const ORIGENS=["Instagram (anúncio)","Instagram (orgânico)","Indicação","WhatsApp","Google","Passou na porta","Outro"];
+const ORIGENS=["Instagram (anúncio)","Instagram (orgânico)","WhatsApp","Indicação","Boca a boca","Google","Passou na porta","Outros","Sem fonte"];
 const ETAPAS=[{k:'lead',l:'Lead'},{k:'conversa',l:'Em conversa'},{k:'followup',l:'Follow-up'},{k:'agendada',l:'Agendada'},{k:'retorno',l:'Retorno'},{k:'realizou',l:'Realizou'},{k:'naoveio',l:'Não veio'}];
 const monthKey=d=>{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')};
 
