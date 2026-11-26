@@ -111,6 +111,12 @@ button{font-family:inherit}
 .card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:12px;padding:11px 12px;box-shadow:var(--shadow);cursor:pointer;transition:transform .08s,box-shadow .12s}
 .card:active{transform:scale(.99)}
 .card:hover{box-shadow:0 6px 18px rgba(40,28,20,.12)}
+.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.statcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 15px}
+.statcard .lbl{font-size:12.5px;color:var(--muted);font-weight:600}
+.statcard .val{font-size:24px;font-weight:800;margin:4px 0 2px;letter-spacing:-.01em;line-height:1}
+.statcard .sub{font-size:11.5px;color:var(--muted)}
+.statcard.accent{border-color:var(--gold2)}.statcard.accent .val{color:var(--gold)}
 .iconbtn:active{transform:scale(.9)}
 .warow{transition:background .12s} .warow:active{background:var(--surface2)}
 .card:hover{transform:translateY(-1px);box-shadow:0 2px 4px rgba(51,44,35,.07),0 14px 32px rgba(51,44,35,.1)}
@@ -1312,7 +1318,23 @@ function viewMeuDia(){
   }
   const base = proFilter ? S.agendamentos.filter(a=>a.profissional_id===proFilter) : S.agendamentos;
   const todays = base.filter(a=>a.inicio && a.inicio.slice(0,10)===hoje && a.status!=='cancelado' && !a.bloqueio).sort((a,b)=>new Date(a.inicio)-new Date(b.inicio));
+  // cartões resumo (estilo Kairo)
+  const mesK=hoje.slice(0,7), mesNome=brDate(hoje,{month:'long'});
+  const agendadas=S.leads.filter(l=>l.etapa==='agendada').length;
+  const leadsNovos=S.leads.filter(l=>(l.criado_em||'').slice(0,7)===mesK).length;
+  const verGrana=isAdmin()||(S.me&&S.me.socia);
+  let card4;
+  if(verGrana){ let fat=0; try{ S.agendamentos.forEach(a=>{ if(a.status==='realizado' && (a.realizado_em||a.inicio||'').slice(0,7)===mesK){ const v=(typeof valorAt==='function')?valorAt(a):a.valor; fat+=Number(v)||0; } }); }catch(_){}
+    card4=['Faturado no mês',fmt(fat),mesNome+' realizado',true]; }
+  else { const real=base.filter(a=>a.status==='realizado' && (a.realizado_em||a.inicio||'').slice(0,7)===mesK).length; card4=['Realizados no mês',String(real),'seus atendimentos',false]; }
+  const grid=EL('div','statgrid');
+  [['Atendimentos hoje',String(todays.length),todays.length?'confira abaixo':'nenhum ainda',false],
+   ['Agendadas',String(agendadas),'aguardando',false],
+   ['Leads novos',String(leadsNovos),'em '+mesNome,false],
+   card4].forEach(([l,v,s,acc])=>{const c=EL('div','statcard'+(acc?' accent':''));c.innerHTML='<div class="lbl"></div><div class="val"></div><div class="sub"></div>';c.querySelector('.lbl').textContent=l;c.querySelector('.val').textContent=v;c.querySelector('.sub').textContent=s;grid.appendChild(c);});
+  w.appendChild(grid);
   const pan=EL('div','panel'); pan.style.marginTop='14px';
+  if(todays.length) pan.appendChild(Object.assign(EL('div','eyebrow'),{textContent:'Agenda de hoje',style:'margin-bottom:4px'}));
   if(!todays.length){pan.appendChild(Object.assign(EL('div','empty'),{textContent:'Nenhum atendimento hoje. Quando agendar, aparece aqui.'}));w.appendChild(pan);return w;}
   todays.forEach(a=>{
     const pro=proById(a.profissional_id), sv=servById(a.servico_id);
