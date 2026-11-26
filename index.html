@@ -117,6 +117,16 @@ button{font-family:inherit}
 .statcard .val{font-size:24px;font-weight:800;margin:4px 0 2px;letter-spacing:-.01em;line-height:1}
 .statcard .sub{font-size:11.5px;color:var(--muted)}
 .statcard.accent{border-color:var(--gold2)}.statcard.accent .val{color:var(--gold)}
+.achips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.achip{display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:999px;border:1px solid var(--line2);background:var(--surface);cursor:pointer;font-weight:600;font-size:13px;font-family:inherit;color:var(--ink);transition:transform .1s,filter .12s}
+.achip:active{transform:scale(.95)} .achip:hover{filter:brightness(.98)}
+.achip svg{width:16px;height:16px;flex:0 0 auto}
+.achip .ct{font-weight:800}
+.achip.red{border-color:color-mix(in srgb,var(--alert) 45%,var(--line2));color:var(--alert);background:color-mix(in srgb,var(--alert) 9%,var(--surface))}
+.achip.yel{border-color:color-mix(in srgb,var(--warn) 45%,var(--line2));color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,var(--surface))}
+.achip.gold{border-color:color-mix(in srgb,var(--gold) 40%,var(--line2));color:var(--gold);background:color-mix(in srgb,var(--gold) 8%,var(--surface))}
+.achip.on{outline:2px solid currentColor;outline-offset:1px;filter:brightness(.97)}
+.achip.flat{color:var(--muted);background:var(--surface2);border-color:var(--line)}
 .cardtabs{display:flex;gap:3px;background:var(--surface2);border-radius:11px;padding:4px;margin:4px 0 14px}
 .cardtab{flex:1;padding:9px 6px;border:0;background:none;border-radius:8px;font-weight:600;font-size:13.5px;color:var(--muted);cursor:pointer;font-family:inherit;transition:.12s}
 .cardtab.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(40,28,20,.1)}
@@ -420,7 +430,11 @@ const ICON={
   file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/></svg>',
   back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
   search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>',
-  dots:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>'
+  dots:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+  video:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="13" height="12" rx="2.3"/><path d="M15.5 10.5 21.5 7v10l-6-3.5Z"/></svg>',
+  sticker:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7l8-8V5a2 2 0 0 0-2-2Z"/><path d="M13 21v-6a2 2 0 0 1 2-2h6"/></svg>'
 };
 function ibtn(svg,cls){const b=EL('button',cls||'iconbtn');b.innerHTML=svg;return b;}
 function renderShell(){
@@ -482,6 +496,9 @@ function soon(t,d){const w=EL('div');w.appendChild(pageHead(t));const s=EL('div'
 
 // ---------- FUNIL ----------
 function diasSemResposta(l){ const k=(l.telefone||'').replace(/\D/g,''); const c=k&&(S.conversas||[]).find(x=>(x.telefone||'').replace(/\D/g,'')===k); const base=c&&c.ultima_em?new Date(c.ultima_em):(l.atualizado_em?new Date(l.atualizado_em):null); if(!base)return -1; return Math.floor((Date.now()-base.getTime())/864e5); }
+function diasDesdeVisita(l){ return l.realizado_em?Math.floor((Date.now()-new Date(l.realizado_em))/864e5):-1; }
+// cliente que fez procedimento, sem retorno marcado: amarelo 20-39 dias, vermelho 40+
+function atencaoBucket(l){ if(l.etapa==='realizou' && !l.retorno && l.realizado_em){ const d=diasDesdeVisita(l); if(d>=40)return 'vermelho'; if(d>=20)return 'amarelo'; } return null; }
 function leadAlert(l){
   if(l.etapa==='retorno' && l.retorno){const dd=Math.ceil((new Date(l.retorno+'T00:00:00')-new Date())/864e5); if(dd<=0)return{cls:'al',txt:'retorno atrasado'}; if(dd<=7)return{cls:'wn',txt:'retorno em '+dd+'d'};}
   if(l.etapa==='realizou' && !l.retorno && l.realizado_em){const dias=Math.floor((new Date()-new Date(l.realizado_em))/864e5); if(dias>=40)return{cls:'al',txt:dias+' dias parada'}; if(dias>=20)return{cls:'wn',txt:dias+' dias parada'};}
@@ -516,26 +533,37 @@ function viewFunil(){
     results.style.display='block';
   };
   sbx.appendChild(si); sbx.appendChild(results); w.appendChild(sbx);
-  // stats
-  const ks=EL('div','kstats');
-  const alerts=S.leads.filter(l=>leadAlert(l)).map(l=>({l,a:leadAlert(l)}));
-  const nRed=alerts.filter(x=>x.a.cls==='al').length, nYel=alerts.filter(x=>x.a.cls==='wn').length;
-  ks.appendChild(statPill('No funil',S.leads.filter(l=>!['realizou','naoveio'].includes(l.etapa)).length));
-  ks.appendChild(statPill(S.funilAtencao?'← Ver tudo':'Precisam de atenção',alerts.length,'var(--alert)',()=>{S.funilAtencao=!S.funilAtencao;render();}));
-  ks.appendChild(statPill('Agendadas',S.leads.filter(l=>l.etapa==='agendada').length,'var(--gold)'));
-  w.appendChild(ks);
-  // visão "precisam de atenção" (clicou no card de cima) — mostra só quem precisa + o motivo
-  if(S.funilAtencao){
-    const sev=x=>x.a.cls==='al'?0:1;
-    alerts.sort((x,y)=> sev(x)-sev(y) || (diasSemResposta(y.l)-diasSemResposta(x.l)));
+  // alertas no topo — SÓ aparecem quando têm gente (chegou no estágio)
+  const semResp=S.leads.filter(l=>l.etapa==='conversa'||l.etapa==='followup');
+  const amarelo=S.leads.filter(l=>atencaoBucket(l)==='amarelo');
+  const vermelho=S.leads.filter(l=>atencaoBucket(l)==='vermelho');
+  const setF=(k)=>()=>{ S.funilFiltro=(S.funilFiltro===k)?null:k; render(); };
+  const cats=[
+    {key:'vermelho',label:'40+ dias sem vir',n:vermelho.length,cls:'red',ic:ICON.alert},
+    {key:'amarelo',label:'20+ dias sem vir',n:amarelo.length,cls:'yel',ic:ICON.clock},
+    {key:'semresposta',label:'Sem resposta',n:semResp.length,cls:'gold',ic:ICON.chat}
+  ].filter(c=>c.n>0);
+  if(cats.length||S.funilFiltro){
+    const ach=EL('div','achips');
+    cats.forEach(c=>{const b=EL('button','achip '+c.cls+(S.funilFiltro===c.key?' on':''));b.innerHTML=c.ic+'<span class="ct">'+c.n+'</span><span>'+c.label+'</span>';b.onclick=setF(c.key);ach.appendChild(b);});
+    if(S.funilFiltro){const vb=EL('button','achip flat');vb.innerHTML='<span>← Ver funil</span>';vb.onclick=()=>{S.funilFiltro=null;render();};ach.appendChild(vb);}
+    w.appendChild(ach);
+  }
+  // visão filtrada por categoria
+  if(S.funilFiltro&&['semresposta','amarelo','vermelho'].includes(S.funilFiltro)){
+    const cfg={
+      semresposta:{list:semResp.slice().sort((a,b)=>diasSemResposta(b)-diasSemResposta(a)),title:'Sem resposta no WhatsApp',desc:'Em conversa ou follow-up · mais dias sem resposta no topo.'},
+      amarelo:{list:amarelo.slice().sort((a,b)=>diasDesdeVisita(b)-diasDesdeVisita(a)),title:'20+ dias sem vir ao estúdio',desc:'Fizeram procedimento, sem retorno marcado, há 20 a 40 dias.'},
+      vermelho:{list:vermelho.slice().sort((a,b)=>diasDesdeVisita(b)-diasDesdeVisita(a)),title:'40+ dias sem vir ao estúdio',desc:'Fizeram procedimento, sem retorno marcado, há mais de 40 dias.'}
+    }[S.funilFiltro];
     const hd=EL('div');hd.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px';
-    hd.appendChild(Object.assign(EL('div'),{textContent:'Precisam de atenção ('+alerts.length+')',style:'font-weight:800;font-size:17px'}));
-    const volta=EL('button','btn ghost sm','Ver funil');volta.onclick=()=>{S.funilAtencao=false;render();};hd.appendChild(volta);
+    hd.appendChild(Object.assign(EL('div'),{textContent:cfg.title+' ('+cfg.list.length+')',style:'font-weight:800;font-size:17px'}));
+    const volta=EL('button','btn ghost sm','Ver funil');volta.onclick=()=>{S.funilFiltro=null;render();};hd.appendChild(volta);
     w.appendChild(hd);
-    w.appendChild(Object.assign(EL('div','muted'),{innerHTML:'<b style="color:var(--alert)">'+nRed+' urgente(s)</b> (vermelho: +40 dias / retorno atrasado) · <b style="color:var(--warn)">'+nYel+' em alerta</b> (amarelo: +20 dias / responder)',style:'font-size:12.5px;margin:6px 0 12px'}));
+    w.appendChild(Object.assign(EL('div','muted'),{textContent:cfg.desc,style:'font-size:12.5px;margin:6px 0 12px'}));
     const list=EL('div');list.style.cssText='display:flex;flex-direction:column;gap:10px';
-    if(!alerts.length)list.appendChild(Object.assign(EL('div','muted'),{textContent:'Tudo em dia! Ninguém precisa de ação agora. 🎉',style:'padding:24px;text-align:center'}));
-    alerts.forEach(x=>list.appendChild(cardLead(x.l)));
+    if(!cfg.list.length)list.appendChild(Object.assign(EL('div','muted'),{textContent:'Ninguém nesta categoria agora.',style:'padding:24px;text-align:center'}));
+    cfg.list.forEach(l=>list.appendChild(cardLead(l)));
     w.appendChild(list); return w;
   }
   const mobile=window.matchMedia&&window.matchMedia('(max-width:720px)').matches;
@@ -612,7 +640,7 @@ function cardLead(l){
   if(l.origem) tags.appendChild(EL('span','tag org',l.origem));
   const al=leadAlert(l); if(al) tags.appendChild(EL('span','tag '+al.cls,al.txt));
   if(l.retorno){const dd=Math.ceil((new Date(l.retorno)-new Date())/864e5);if(dd<=7)tags.appendChild(EL('span','tag wn',dd<=0?'retorno hoje':'retorno '+dd+'d'));}
-  if((l.etapa||'')==='followup'){ const _k=(l.telefone||'').replace(/\D/g,''); const _c=_k&&(S.conversas||[]).find(c=>(c.telefone||'').replace(/\D/g,'')===_k); const _base=_c&&_c.ultima_em?new Date(_c.ultima_em):(l.atualizado_em?new Date(l.atualizado_em):null); if(_base){const _d=Math.floor((Date.now()-_base.getTime())/864e5); tags.appendChild(EL('span','tag al','⏳ '+(_d<=0?'hoje':_d+'d sem resposta')));} }
+  if((l.etapa||'')==='followup'||(l.etapa||'')==='conversa'){ const _d=diasSemResposta(l); if(_d>=0){ tags.appendChild(EL('span','tag '+(_d>=20?'al':'wn'),(_d<=0?'hoje':_d+'d sem resposta'))); } }
   const bd=bdayInfo(l.nascimento);
   if(bd){
     if(bd.today){tags.appendChild(EL('span','tag money','🎂 aniversário hoje'));c.style.background='var(--goldsoft)';}
@@ -1659,11 +1687,12 @@ async function threadView(telefone, opts){
   const inImg=document.createElement('input');inImg.type='file';inImg.accept='image/*';inImg.hidden=true;inImg.onchange=()=>{envMidia(inImg.files[0],'image');inImg.value='';};
   const inDoc=document.createElement('input');inDoc.type='file';inDoc.hidden=true;inDoc.onchange=()=>{envMidia(inDoc.files[0],'document');inDoc.value='';};
   const inCam=document.createElement('input');inCam.type='file';inCam.accept='image/*';inCam.capture='environment';inCam.hidden=true;inCam.onchange=()=>{envMidia(inCam.files[0],'image');inCam.value='';};
-  foot.appendChild(inImg);foot.appendChild(inDoc);foot.appendChild(inCam);
+  const inVid=document.createElement('input');inVid.type='file';inVid.accept='video/*';inVid.hidden=true;inVid.onchange=()=>{envMidia(inVid.files[0],'video');inVid.value='';};
+  foot.appendChild(inImg);foot.appendChild(inDoc);foot.appendChild(inCam);foot.appendChild(inVid);
   // botão + (menu anexos)
   const plus=ibtn(ICON.plus);plus.title='Anexar';
   plus.onclick=()=>{ const menu=EL('div');menu.style.cssText='position:absolute;bottom:58px;left:10px;background:var(--surface);border:1px solid var(--line2);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;z-index:5;min-width:170px';
-    [[ICON.image,'Foto',()=>inImg.click()],[ICON.file,'Documento',()=>inDoc.click()]].forEach(([ic,t,fn])=>{const b=EL('div');b.style.cssText='display:flex;align-items:center;gap:11px;padding:12px 16px;cursor:pointer;font-size:14px;white-space:nowrap;color:var(--ink)';b.innerHTML='<span style="display:inline-flex;color:var(--muted)">'+ic+'</span><span>'+t+'</span>';b.querySelector('svg').style.cssText='width:19px;height:19px';b.onmouseenter=()=>b.style.background='var(--surface2)';b.onmouseleave=()=>b.style.background='';b.onclick=()=>{menu.remove();fn();};menu.appendChild(b);});
+    [[ICON.image,'Foto',()=>inImg.click()],[ICON.video,'Vídeo',()=>inVid.click()],[ICON.file,'Documento',()=>inDoc.click()]].forEach(([ic,t,fn])=>{const b=EL('div');b.style.cssText='display:flex;align-items:center;gap:11px;padding:12px 16px;cursor:pointer;font-size:14px;white-space:nowrap;color:var(--ink)';b.innerHTML='<span style="display:inline-flex;color:var(--muted)">'+ic+'</span><span>'+t+'</span>';b.querySelector('svg').style.cssText='width:19px;height:19px';b.onmouseenter=()=>b.style.background='var(--surface2)';b.onmouseleave=()=>b.style.background='';b.onclick=()=>{menu.remove();fn();};menu.appendChild(b);});
     foot.appendChild(menu); const close=(e)=>{if(!menu.contains(e.target)&&e.target!==plus){menu.remove();document.removeEventListener('click',close);}}; setTimeout(()=>document.addEventListener('click',close),0); };
   // câmera
   const camBtn=ibtn(ICON.camera);camBtn.title='Câmera';camBtn.onclick=()=>inCam.click();
