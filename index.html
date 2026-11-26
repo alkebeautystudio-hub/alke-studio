@@ -1328,7 +1328,7 @@ async function enviarLinkCadastro(leadId){
   const tel=l.telefone.replace(/\D/g,''); if(tel.length<10) return;
   const prim=(l.nome||'').split(' ')[0]||'';
   const link='https://alkebeautystudio-hub.github.io/alke-studio/cadastro.html?tel=55'+tel.replace(/^55/,'')+(prim?('&nome='+encodeURIComponent(prim)):'');
-  const msg='Oi'+(prim?(' '+prim):'')+'! 💛 Pra deixar seu atendimento certinho e garantir condições exclusivas do nosso estúdio, completa seu cadastro rapidinho aqui: '+link;
+  const msg='Oi! 💛 Pra deixar seu atendimento certinho e garantir condições exclusivas do nosso estúdio, completa seu cadastro rapidinho aqui: '+link;
   const r=await fzapCall('send',{phone:tel,body:msg});
   if(r&&r.ok){ await sb.from('leads').update({link_cadastro_em:new Date().toISOString()}).eq('id',leadId); }
 }
