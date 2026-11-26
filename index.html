@@ -42,6 +42,8 @@ html,body{margin:0;height:100%}
 body{background:radial-gradient(1100px 640px at 50% -240px, var(--surface), var(--bg) 62%) fixed;color:var(--ink);font-family:var(--body);font-size:14px;-webkit-font-smoothing:antialiased}
 h1,h2,h3,h4{font-family:var(--disp);font-weight:600;margin:0;letter-spacing:.2px}
 button,input,select,textarea{font-family:var(--body);font-size:14px}
+/* iOS: campo com fonte <16px faz zoom automático ao focar. No celular, força 16px em tudo. */
+@media(max-width:820px){input,select,textarea{font-size:16px!important}}
 button{cursor:pointer}
 .gold{color:var(--gold)}
 .serif{font-family:var(--disp)}
@@ -121,7 +123,8 @@ button{cursor:pointer}
 .warow:hover{background:var(--bg)} .warow.on{background:var(--goldsoft)}
 .wachat{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;min-height:0}
 .wachat .wahead{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
-.wachat .wabody{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:7px;padding:12px;background:var(--bg)}
+.wachat .wabody{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;flex-direction:column;gap:7px;padding:12px;background:var(--bg)}
+body.scroll-locked{position:fixed;left:0;right:0;width:100%;overflow:hidden}
 .wachat .wafoot{padding:10px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:flex-end}
 .waback{display:none}
 @media(max-width:720px){
@@ -1450,8 +1453,10 @@ function viewConversas(){
       const av=avatarEl(c,38,false);
       const mid=EL('div');mid.style.cssText='flex:1 1 auto;min-width:0';
       const l1=EL('div');l1.style.cssText='display:flex;align-items:center;gap:6px';
-      l1.appendChild(Object.assign(EL('div'),{textContent:nomeDaConversa(c),style:'font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto'}));
-      if(c.nao_lidas>0){const b=EL('span');b.textContent=c.nao_lidas;b.style.cssText='background:var(--win);color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;flex:0 0 auto';l1.appendChild(b);}
+      const unread=c.nao_lidas>0;
+      const dot=EL('span');dot.title=unread?'não lida':'lida';dot.style.cssText='width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:'+(unread?'var(--gold)':'var(--win)');l1.appendChild(dot);
+      l1.appendChild(Object.assign(EL('div'),{textContent:nomeDaConversa(c),style:'font-weight:'+(unread?'700':'600')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto'}));
+      if(unread){const b=EL('span');b.textContent=c.nao_lidas;b.style.cssText='background:var(--gold);color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;flex:0 0 auto';l1.appendChild(b);}
       mid.appendChild(l1);
       mid.appendChild(Object.assign(EL('div','muted'),{textContent:(c.ultima_msg||'').slice(0,42),style:'font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
       row.appendChild(av);row.appendChild(mid);
@@ -1723,7 +1728,12 @@ function minhaConta(){
 function inp(type,val,ph){const i=document.createElement('input');i.type=type;if(val!=null)i.value=val;if(ph)i.placeholder=ph;return i}
 function sel(opts,val,ph){const s=document.createElement('select');if(ph)s.appendChild(new Option(ph,''));opts.forEach(([v,l])=>s.appendChild(new Option(l,v)));if(val!=null)s.value=val;return s}
 function field(label,node){const f=EL('div','f');f.appendChild(EL('label',null,label));f.appendChild(node);return f}
-function overlay(node){const ov=EL('div','ov');ov.onclick=e=>{if(e.target===ov)ov.remove()};ov.appendChild(node);document.body.appendChild(ov);return ov}
+let _lockY=0;
+function syncScrollLock(){ const open=!!document.querySelector('.ov'); const b=document.body; const locked=b.classList.contains('scroll-locked');
+  if(open&&!locked){ _lockY=window.scrollY||window.pageYOffset||0; b.style.top=(-_lockY)+'px'; b.classList.add('scroll-locked'); }
+  else if(!open&&locked){ b.classList.remove('scroll-locked'); b.style.top=''; window.scrollTo(0,_lockY); } }
+try{ new MutationObserver(syncScrollLock).observe(document.body,{childList:true}); }catch(_){}
+function overlay(node){const ov=EL('div','ov');ov.onclick=e=>{if(e.target===ov)ov.remove()};ov.appendChild(node);document.body.appendChild(ov);syncScrollLock();return ov}
 
 boot();
 </script>
