@@ -1388,6 +1388,16 @@ function openBloqueio(ag,prefill){
   const ov=overlay(m);
 }
 // ---------- MEU DIA ----------
+function _nthDom(ano,mes,n){ let d=new Date(ano,mes,1),c=0; while(true){ if(d.getDay()===0){c++;if(c===n)return new Date(d);} d.setDate(d.getDate()+1);} }
+function _ultSex(ano,mes){ let d=new Date(ano,mes+1,0); while(d.getDay()!==5)d.setDate(d.getDate()-1); return d; }
+function datasComemorativas(ano){ return [
+  {n:'Ano Novo',d:new Date(ano,0,1)},{n:'Dia da Mulher',d:new Date(ano,2,8)},{n:'Dia das Mães',d:_nthDom(ano,4,2)},
+  {n:'Dia dos Namorados',d:new Date(ano,5,12)},{n:'Dia dos Pais',d:_nthDom(ano,7,2)},{n:'Dia das Crianças',d:new Date(ano,9,12)},
+  {n:'Black Friday',d:_ultSex(ano,10)},{n:'Natal',d:new Date(ano,11,25)},{n:'Réveillon',d:new Date(ano,11,31)}
+]; }
+function proximasDatas(n){ const hoje=new Date();hoje.setHours(0,0,0,0);const y=hoje.getFullYear();
+  let all=datasComemorativas(y).concat(datasComemorativas(y+1)).map(x=>({n:x.n,d:x.d,dias:Math.round((x.d-hoje)/864e5)})).filter(x=>x.dias>=0).sort((a,b)=>a.dias-b.dias);
+  return all.slice(0,n||5); }
 function viewMeuDia(){
   const w=EL('div'); const hoje=new Date().toISOString().slice(0,10);
   w.appendChild(pageHead('Meu dia', brDate(hoje,{weekday:'long',day:'2-digit',month:'long'})));
@@ -1416,6 +1426,21 @@ function viewMeuDia(){
    ['Leads novos',String(leadsNovos),'em '+mesNome,false],
    card4].forEach(([l,v,s,acc])=>{const c=EL('div','statcard'+(acc?' accent':''));c.innerHTML='<div class="lbl"></div><div class="val"></div><div class="sub"></div>';c.querySelector('.lbl').textContent=l;c.querySelector('.val').textContent=v;c.querySelector('.sub').textContent=s;grid.appendChild(c);});
   w.appendChild(grid);
+  // próximas datas comemorativas — pra planejar promoção
+  const datas=proximasDatas(5);
+  if(datas.length){
+    const dc=EL('div');dc.style.marginTop='16px';
+    dc.appendChild(Object.assign(EL('div','eyebrow'),{textContent:'Próximas datas — planeje a promoção',style:'margin-bottom:8px'}));
+    const row=EL('div');row.style.cssText='display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch';
+    datas.forEach(x=>{ const cc=EL('div');const perto=x.dias<=14;
+      cc.style.cssText='flex:0 0 auto;min-width:138px;background:var(--surface);border:1px solid '+(perto?'var(--gold2)':'var(--line)')+';border-radius:12px;padding:12px 13px';
+      cc.appendChild(Object.assign(EL('div'),{textContent:x.n,style:'font-weight:700;font-size:14px'}));
+      const quando=x.dias===0?'é hoje! 🎉':x.dias===1?'amanhã':'em '+x.dias+' dias';
+      cc.appendChild(Object.assign(EL('div'),{textContent:quando+' · '+x.d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}),style:'font-size:12px;color:'+(perto?'var(--gold)':'var(--muted)')+';margin-top:3px;font-weight:'+(perto?'600':'400')}));
+      row.appendChild(cc);
+    });
+    dc.appendChild(row); w.appendChild(dc);
+  }
   const pan=EL('div','panel'); pan.style.marginTop='14px';
   if(todays.length) pan.appendChild(Object.assign(EL('div','eyebrow'),{textContent:'Agenda de hoje',style:'margin-bottom:4px'}));
   if(!todays.length){pan.appendChild(Object.assign(EL('div','empty'),{textContent:'Nenhum atendimento hoje. Quando agendar, aparece aqui.'}));w.appendChild(pan);return w;}
