@@ -2200,8 +2200,8 @@ function viewEquipe(){
 }
 function loginModal(p,mode){
   const m=EL('div','modal'); m.appendChild(EL('h3',null,(mode==='create'?'Criar login — ':'Resetar senha — ')+p.nome));
-  const email=inp('email','','e-mail da profissional'); const pw=inp('password','','senha (mín. 6)');
-  if(mode==='create') m.appendChild(field('E-mail dela',email));
+  const email=inp('email',p.email||'','e-mail da profissional'); const pw=inp('password','','senha (mín. 6)');
+  if(mode==='create'){ m.appendChild(field('E-mail dela',email)); m.appendChild(Object.assign(EL('div','muted'),{style:'font-size:12px;margin:-4px 0 8px',textContent:'Esse mesmo e-mail será o convidado nos agendamentos dela.'})); }
   m.appendChild(field(mode==='create'?'Senha de acesso':'Nova senha',pw));
   const msg=EL('div','muted');msg.style.fontSize='13px';m.appendChild(msg);
   const act=EL('div','mactions');
