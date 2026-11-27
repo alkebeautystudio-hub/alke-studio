@@ -823,7 +823,7 @@ function servicosBloco(id,closer){
       const ok=EL('button','qb ok','✓ Realizou');ok.onclick=()=>marcarServico(a.id,'realizado',id);
       const no=EL('button','qb no','✕ Faltou');no.onclick=()=>marcarServico(a.id,'faltou',id);
       const dm=EL('button','qb','⊘ Desmarcar');dm.onclick=()=>desmarcarServico(a.id,id);
-      const ed=EL('button','qb','Editar');ed.onclick=()=>{closer();openAgendamento(a,{})};
+      const ed=EL('button','qb','📅 Remarcar');ed.onclick=()=>{closer();openAgendamento(a,{})};
       btns.appendChild(ok);btns.appendChild(no);btns.appendChild(dm);btns.appendChild(ed);
     } else {
       const undo=EL('button','qb','↩ Desfazer');undo.onclick=()=>marcarServico(a.id,'marcado',id);
