@@ -363,6 +363,27 @@ async function boot(){
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='block';
   await loadAll(); renderShell(); render();
+  setupGlobalRealtime();
+}
+// TEMPO REAL GLOBAL: qualquer mudança no banco (lead novo, cadastro preenchido, agendamento, serviço…) atualiza a tela sozinha
+let _rtChan=null, _rtT=null;
+function setupGlobalRealtime(){
+  if(_rtChan){ try{sb.removeChannel(_rtChan);}catch(_){} _rtChan=null; }
+  const reload=()=>{ clearTimeout(_rtT); _rtT=setTimeout(async()=>{
+    await loadAll();
+    // não re-renderiza por cima de um modal aberto (form) nem da conversa aberta (tem tempo real próprio)
+    const busy = document.querySelector('.ov') || (S.tab==='conversas' && S.convSel);
+    if(!busy){ try{ render(); renderShell(); }catch(_){} }
+  }, 600); };
+  try{
+    _rtChan=sb.channel('alke-global-rt')
+      .on('postgres_changes',{event:'*',schema:'public',table:'leads'},reload)
+      .on('postgres_changes',{event:'*',schema:'public',table:'agendamentos'},reload)
+      .on('postgres_changes',{event:'*',schema:'public',table:'conversas'},reload)
+      .on('postgres_changes',{event:'*',schema:'public',table:'servicos'},reload)
+      .on('postgres_changes',{event:'*',schema:'public',table:'despesas'},reload)
+      .subscribe();
+  }catch(_){}
 }
 async function loadAll(){
   const [pros,serv,prec,leads,fin,cfg,desp,ags,cvs]=await Promise.all([
