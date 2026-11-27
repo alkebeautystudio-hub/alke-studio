@@ -362,6 +362,8 @@ async function boot(){
   if(!session){document.getElementById('login').style.display='grid';document.getElementById('app').style.display='none';return;}
   // carrega "quem sou eu"
   const {data:me}=await sb.from('profissionais').select('*').eq('user_id',session.user.id).maybeSingle();
+  // KILL SWITCH: se o ADM deslogou essa conta (ou trocou a senha), cai fora
+  if(me&&me.sessao_min){ try{ const iat=JSON.parse(atob(session.access_token.split('.')[1])).iat*1000; if(iat<new Date(me.sessao_min).getTime()){ await sb.auth.signOut(); location.reload(); return; } }catch(_){} }
   S.me=me||{nome:session.user.email,admin:false,socia:false};
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='block';
@@ -391,8 +393,10 @@ function setupGlobalRealtime(){
 // ATUALIZAÇÃO GERAL: ao abrir/voltar pro app ou quando a internet volta, puxa tudo de novo
 // (cobre o tempo em que o app ficou fechado ou a net caiu; enquanto aberto, o tempo real acima cuida)
 let _resyncT=null;
+async function checkKill(){ try{ const {data:{session}}=await sb.auth.getSession(); if(!session)return; const {data:me}=await sb.from('profissionais').select('sessao_min').eq('user_id',session.user.id).maybeSingle(); if(me&&me.sessao_min){ const iat=JSON.parse(atob(session.access_token.split('.')[1])).iat*1000; if(iat<new Date(me.sessao_min).getTime()){ await sb.auth.signOut(); location.reload(); } } }catch(_){} }
 async function resyncTudo(){
   try{ const {data:{session}}=await sb.auth.getSession(); if(!session)return; }catch(_){ return; }
+  checkKill();                           // se o ADM deslogou/trocou senha dela, sai fora
   setupGlobalRealtime();                 // reconecta os canais de tempo real (podem ter morrido na queda)
   await loadAll();                        // puxa card, funil, conversas, financeiro… tudo fresco
   try{ if(typeof window._alkeThreadReload==='function') await window._alkeThreadReload(); }catch(_){} // conversa aberta recarrega
@@ -479,6 +483,34 @@ const ICON={
   sticker:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7l8-8V5a2 2 0 0 0-2-2Z"/><path d="M13 21v-6a2 2 0 0 1 2-2h6"/></svg>'
 };
 function ibtn(svg,cls){const b=EL('button',cls||'iconbtn');b.innerHTML=svg;return b;}
+const SVG_EYE='<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const SVG_EYEOFF='<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 10.7a3 3 0 0 0 4.2 4.2M9.8 5.1A10.5 10.5 0 0 1 12 5c7 0 10.5 7 10.5 7a17.6 17.6 0 0 1-3.1 4M6 6.1A17.3 17.3 0 0 0 1.5 12S5 19 12 19c1.2 0 2.3-.2 3.3-.5"/></svg>';
+const SVG_SMILE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg>';
+// olho pra mostrar/ocultar senha (envolve um input[type=password])
+function pwBox(input){
+  const w=EL('div');w.style.cssText='position:relative';
+  input.style.width='100%';input.style.paddingRight='42px';
+  const eye=EL('button');eye.type='button';eye.title='Mostrar senha';
+  eye.style.cssText='position:absolute;right:7px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);cursor:pointer;padding:6px;display:flex;align-items:center';
+  const draw=()=>{eye.innerHTML=input.type==='password'?SVG_EYE:SVG_EYEOFF;eye.title=input.type==='password'?'Mostrar senha':'Ocultar senha';};
+  eye.onclick=()=>{input.type=input.type==='password'?'text':'password';draw();input.focus();};
+  draw(); w.appendChild(input);w.appendChild(eye); return w;
+}
+// X pra limpar o campo de busca de uma vez
+function searchBox(input,wrapCss){
+  const w=EL('div');w.style.cssText='position:relative;'+(wrapCss||'width:100%');
+  input.style.width='100%';input.style.paddingRight='36px';
+  const x=EL('button');x.type='button';x.textContent='✕';
+  x.style.cssText='position:absolute;right:8px;top:50%;transform:translateY(-50%);width:22px;height:22px;border:0;border-radius:50%;background:var(--surface2);color:var(--muted);cursor:pointer;display:none;align-items:center;justify-content:center;font-size:12px;line-height:1;padding:0';
+  const upd=()=>{x.style.display=input.value?'inline-flex':'none';};
+  x.onclick=()=>{input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));upd();input.focus();};
+  input.addEventListener('input',upd); upd();
+  w.appendChild(input);w.appendChild(x); return w;
+}
+// adiciona o olho na senha da tela de login inicial
+function enhanceLoginPw(){ const s=document.getElementById('senha'); if(!s||s.dataset.eyed)return; s.dataset.eyed='1';
+  const parent=s.parentNode, next=s.nextSibling; s.style.marginBottom='0';
+  const box=pwBox(s); box.style.marginBottom='11px'; parent.insertBefore(box,next); }
 function renderShell(){
   let tabs=[['meudia','Meu dia',ICON.sun],['funil','Funil',ICON.funnel],['agenda','Agenda',ICON.cal],['clientes','Clientes',ICON.people],['conversas','Conversas',ICON.chat],['aniversarios','Aniversários',ICON.cake],['servicos','Serviços',ICON.tag],['painel','Dashboard',ICON.chart]];
   tabs=tabs.filter(t=>{ if(t[0]==='funil')return canTab('funil'); if(t[0]==='servicos')return canTab('servicos'); if(t[0]==='conversas')return canTab('conversas'); return true; });
@@ -578,7 +610,7 @@ function viewFunil(){
     });
     results.style.display='block';
   };
-  sbx.appendChild(si); sbx.appendChild(results); w.appendChild(sbx);
+  sbx.appendChild(searchBox(si)); sbx.appendChild(results); w.appendChild(sbx);
   // alertas no topo — SÓ aparecem quando têm gente
   const reativar=S.leads.filter(l=>l.etapa==='followup');  // 1º contato, nunca agendou, sumiu -> reativar
   const byMarco={10:[],15:[],20:[],25:[],30:[]};
@@ -1823,7 +1855,7 @@ async function threadView(telefone, opts){
   }
   function forwardPicker(mm){ actionSheet((card,close)=>{
     card.appendChild(Object.assign(EL('div'),{textContent:'Encaminhar para',style:'font-weight:800;font-size:16px;padding:12px 22px 6px'}));
-    const si=document.createElement('input');si.placeholder='Buscar conversa';si.style.cssText='width:calc(100% - 44px);margin:0 22px 8px;padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--bg);color:var(--ink)';card.appendChild(si);
+    const si=document.createElement('input');si.placeholder='Buscar conversa';si.style.cssText='padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--bg);color:var(--ink)';card.appendChild(searchBox(si,'margin:0 22px 8px'));
     const list=EL('div');card.appendChild(list);
     const draw=()=>{ list.innerHTML=''; const q=si.value.trim().toLowerCase();
       (S.conversas||[]).filter(cv=>!q||nomeDaConversa(cv).toLowerCase().includes(q)||(cv.telefone||'').includes(q)).slice(0,30).forEach(cv=>{
@@ -1865,6 +1897,14 @@ async function threadView(telefone, opts){
   // câmera
   const camBtn=ibtn(ICON.camera);camBtn.title='Câmera';camBtn.onclick=()=>inCam.click();
   const ta=document.createElement('textarea');ta.rows=1;ta.placeholder='Mensagem';ta.style.cssText='flex:1;min-width:0;padding:11px 12px;border:1px solid var(--line2);border-radius:20px;background:var(--surface);color:var(--ink);resize:none;max-height:120px';
+  // emoji (abre painel com vários pra mandar)
+  const EMO='😀 😁 😂 🤣 🥹 😊 😇 🙂 😉 😌 😍 🥰 😘 😗 😙 😚 😋 😛 😜 🤪 😎 🥳 🤗 🤔 🤭 🫶 😏 😒 😔 😞 🙁 😣 😫 😩 🥺 😢 😭 😤 😠 🤯 😳 🥵 😱 😴 🤤 ❤️ 🧡 💛 💚 💙 💜 🤎 🖤 🤍 💔 💕 💞 💓 💗 💖 💘 💝 💟 ✨ ⭐ 🌟 💫 🔥 💯 🎉 🎊 🥂 🍾 🎁 🌸 🌺 🌷 🌹 💐 💄 💋 👄 👀 🙌 🙏 👏 👍 👎 👌 🤌 ✌️ 🤞 🫰 👋 💪 💅 🤳 ✅ ❌ ❓ ❗ 💥 💦 👑 💎 ☀️ 🌙 ⏰ 📅 📍 💰 ✍️'.split(' ').filter(Boolean);
+  const emo=EL('button','iconbtn');emo.innerHTML=SVG_SMILE;emo.title='Emoji';
+  const insertEmoji=(e)=>{ const a=(ta.selectionStart!=null?ta.selectionStart:ta.value.length), b=(ta.selectionEnd!=null?ta.selectionEnd:a); ta.value=ta.value.slice(0,a)+e+ta.value.slice(b); const np=a+e.length; ta.selectionStart=ta.selectionEnd=np; ta.focus(); toggleSend(); };
+  emo.onclick=()=>{ const open=foot.querySelector('.emojipanel'); if(open){open.remove();return;}
+    const pan=EL('div','emojipanel');pan.style.cssText='position:absolute;bottom:58px;left:10px;right:10px;max-width:340px;background:var(--surface);border:1px solid var(--line2);border-radius:14px;box-shadow:var(--shadow-hi);z-index:6;padding:8px;max-height:244px;overflow:auto;display:grid;grid-template-columns:repeat(8,1fr);gap:2px';
+    EMO.forEach(ch=>{const b=EL('button');b.type='button';b.textContent=ch;b.style.cssText='border:0;background:none;font-size:22px;line-height:1;padding:5px 0;cursor:pointer;border-radius:8px';b.onmouseenter=()=>b.style.background='var(--surface2)';b.onmouseleave=()=>b.style.background='';b.onclick=()=>insertEmoji(ch);pan.appendChild(b);});
+    foot.appendChild(pan); const close=(ev)=>{if(!pan.contains(ev.target)&&ev.target!==emo&&!emo.contains(ev.target)){pan.remove();document.removeEventListener('click',close);}}; setTimeout(()=>document.addEventListener('click',close),0); };
   // microfone (gravação de áudio)
   const micBtn=ibtn(ICON.mic);micBtn.title='Gravar áudio';
   let rec=null,chunks=[],recTimer=null,cancelRec=false;
@@ -1899,7 +1939,7 @@ async function threadView(telefone, opts){
   foot.style.position='relative';foot.style.flexDirection='column';foot.style.alignItems='stretch';
   replyBar=EL('div');replyBar.style.cssText='display:none;align-items:center;gap:6px;padding:5px 2px 7px;margin-bottom:5px;border-bottom:1px solid var(--line)';
   const inputRow=EL('div');inputRow.style.cssText='display:flex;align-items:flex-end;gap:3px';
-  inputRow.appendChild(plus);inputRow.appendChild(ta);inputRow.appendChild(camBtn);inputRow.appendChild(micBtn);inputRow.appendChild(send);
+  inputRow.appendChild(plus);inputRow.appendChild(emo);inputRow.appendChild(ta);inputRow.appendChild(camBtn);inputRow.appendChild(micBtn);inputRow.appendChild(send);
   foot.appendChild(replyBar);foot.appendChild(inputRow);wrap.appendChild(foot);
   return wrap;
 }
@@ -1936,7 +1976,7 @@ function viewConversas(){
     cnt.appendChild(mk((naoLidas||'0')+' não lida'+(naoLidas===1?'':'s'), naoLidas?'var(--win)':'var(--line)', naoLidas?'#fff':'var(--muted)')); };
   const layout=EL('div','walayout');
   const left=EL('div','walist'); const right=EL('div','wachat');
-  const sb2=EL('div','walsearch'); const search=document.createElement('input');search.type='text';search.placeholder='Buscar conversa';search.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';sb2.appendChild(search);left.appendChild(sb2);
+  const sb2=EL('div','walsearch'); const search=document.createElement('input');search.type='text';search.placeholder='Buscar conversa';search.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';sb2.appendChild(searchBox(search));left.appendChild(sb2);
   const rows=EL('div','walrows'); left.appendChild(rows);
   const showEmpty=()=>{ stopAlkeAudio(); right.innerHTML=''; const e=EL('div');e.style.cssText='margin:auto;text-align:center;color:var(--muted);font-size:14px;padding:30px';e.textContent='Escolha uma conversa à esquerda.';right.appendChild(e); layout.classList.remove('showchat'); S.convSel=null; drawRows(); };
   const openIn=async(tel)=>{ stopAlkeAudio(); S.convSel=tel; layout.classList.add('showchat'); right.innerHTML=''; right.appendChild(Object.assign(EL('div','muted'),{textContent:'Abrindo…',style:'margin:auto'})); const el=await threadView(tel,{onBack:showEmpty,onSent:drawRows}); right.innerHTML=''; right.appendChild(el); if(el._toBottom)el._toBottom(); drawRows(); };
@@ -2019,8 +2059,8 @@ async function openConectarWhats(){
 function viewClientes(){
   const w=EL('div'); w.appendChild(pageHead('Clientes'));
   const search=document.createElement('input'); search.type='text'; search.placeholder='Buscar por nome ou telefone';
-  search.style.cssText='width:100%;max-width:340px;padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--surface);color:var(--ink);margin-top:6px';
-  w.appendChild(search);
+  search.style.cssText='padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--surface);color:var(--ink)';
+  w.appendChild(searchBox(search,'max-width:340px;margin-top:6px'));
   const map={};
   S.leads.forEach(l=>{const key=(l.telefone||'').replace(/\D/g,'')||('n:'+(l.nome||'').toLowerCase());if(!key)return;if(!map[key])map[key]={nome:l.nome,telefone:l.telefone,nascimento:l.nascimento,email:l.email,instagram:l.instagram,origem:l.origem,leads:[]};map[key].leads.push(l);if(l.nascimento&&!map[key].nascimento)map[key].nascimento=l.nascimento;if(l.email&&!map[key].email)map[key].email=l.email;if(l.instagram&&!map[key].instagram)map[key].instagram=l.instagram;});
   const list=EL('div','panel'); list.style.marginTop='12px';
@@ -2202,7 +2242,10 @@ function viewEquipe(){
       const row=EL('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:4px';
       const tag=EL('span');tag.textContent='✓ Login criado';tag.style.cssText='font-size:12px;font-weight:700;color:var(--win);background:color-mix(in srgb,var(--win) 14%,transparent);padding:4px 11px;border-radius:999px';
       row.appendChild(tag);
-      const rs=EL('button','btn ghost sm','Resetar senha');rs.onclick=()=>loginModal(p,'reset');row.appendChild(rs);
+      const accbtns=EL('div','row');accbtns.style.cssText='gap:8px;flex:0 0 auto';
+      const lo=EL('button','btn ghost sm','Deslogar');lo.onclick=async()=>{ if(!confirm('Deslogar '+(p.nome||'ela')+' de todos os aparelhos? Ela vai precisar entrar de novo com a senha.'))return; lo.textContent='Saindo…'; const {data,error}=await sb.functions.invoke('admin-users',{body:{action:'logout',profissional_id:p.id}}); const err=(data&&data.error)||(error&&error.message); lo.textContent='Deslogar'; if(err){alert('Erro: '+err);return;} alert((p.nome||'Ela')+' foi deslogada. Na próxima vez que o app dela abrir, vai pedir login.'); };
+      const rs=EL('button','btn ghost sm','Resetar senha');rs.onclick=()=>loginModal(p,'reset');
+      accbtns.appendChild(lo);accbtns.appendChild(rs);row.appendChild(accbtns);
       acc.appendChild(row);
     } else {
       // sem login: só o convite pra criar (o e-mail é pedido na hora de criar)
@@ -2234,7 +2277,7 @@ function loginModal(p,mode){
   const m=EL('div','modal'); m.appendChild(EL('h3',null,(mode==='create'?'Criar login — ':'Resetar senha — ')+p.nome));
   const email=inp('email',p.email||'','e-mail da profissional'); const pw=inp('password','','senha (mín. 6)');
   if(mode==='create'){ m.appendChild(field('E-mail dela',email)); m.appendChild(Object.assign(EL('div','muted'),{style:'font-size:12px;margin:-4px 0 8px',textContent:'Esse mesmo e-mail será o convidado nos agendamentos dela.'})); }
-  m.appendChild(field(mode==='create'?'Senha de acesso':'Nova senha',pw));
+  m.appendChild(field(mode==='create'?'Senha de acesso':'Nova senha',pwBox(pw)));
   const msg=EL('div','muted');msg.style.fontSize='13px';m.appendChild(msg);
   const act=EL('div','mactions');
   const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
@@ -2257,7 +2300,7 @@ function minhaConta(){
   const m=EL('div','modal'); m.appendChild(EL('h3',null,'Minha conta'));
   m.appendChild(EL('p','muted','Trocar a sua senha de acesso.'));
   const p1=inp('password','','nova senha (mín. 6)'); const p2=inp('password','','repetir senha');
-  m.appendChild(field('Nova senha',p1)); m.appendChild(field('Repetir',p2));
+  m.appendChild(field('Nova senha',pwBox(p1))); m.appendChild(field('Repetir',pwBox(p2)));
   const msg=EL('div','muted');msg.style.fontSize='13px';m.appendChild(msg);
   const act=EL('div','mactions');
   const cancel=EL('button','btn ghost','Fechar');cancel.onclick=()=>ov.remove();
@@ -2282,6 +2325,7 @@ function syncScrollLock(){ document.body.classList.toggle('scroll-locked',!!docu
 try{ new MutationObserver(syncScrollLock).observe(document.body,{childList:true}); }catch(_){}
 function overlay(node){const ov=EL('div','ov');ov.onclick=e=>{if(e.target===ov)ov.remove()};ov.appendChild(node);document.body.appendChild(ov);syncScrollLock();return ov}
 
+enhanceLoginPw();
 boot();
 </script>
 </body>
