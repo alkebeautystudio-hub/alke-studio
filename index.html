@@ -221,9 +221,12 @@ body.scroll-locked{overflow:hidden}
 .tag.al{background:color-mix(in srgb,var(--alert) 15%,transparent);color:var(--alert)}
 .tag.wn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
 .tag.money{background:color-mix(in srgb,var(--win) 15%,transparent);color:var(--win);font-variant-numeric:tabular-nums}
-.qa{display:flex;gap:6px;margin-top:9px}
-.qb{flex:1;border:1px solid var(--line2);background:var(--bg);border-radius:8px;padding:6px;font-size:12px;font-weight:600;color:var(--muted)}
-.qb.go{color:var(--gold);border-color:var(--gold)} .qb.ok{color:var(--win)} .qb.no{color:var(--muted)}
+.qa{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}
+.qb{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--line2);background:var(--surface);border-radius:11px;padding:9px 10px;font-size:12.5px;font-weight:600;color:var(--ink);min-height:40px;white-space:nowrap;transition:background .12s,border-color .12s,transform .08s}
+.qb:hover{background:var(--surface2)} .qb:active{transform:scale(.97)}
+.qb.go{color:var(--gold);border-color:color-mix(in srgb,var(--gold) 45%,var(--line2))}
+.qb.ok{color:var(--win);border-color:color-mix(in srgb,var(--win) 42%,var(--line2))}
+.qb.no{color:var(--alert);border-color:color-mix(in srgb,var(--alert) 38%,var(--line2))}
 /* ====== CARDS/TILES ====== */
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:13px;margin-top:16px}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:17px;box-shadow:var(--shadow)}
