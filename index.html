@@ -493,7 +493,9 @@ function renderShell(){
     const more=EL('button',''); more.innerHTML=ICON.more+'<span>Mais</span>'; more.onclick=openDrawer; bot.appendChild(more);
   }
 }
+function stopAlkeAudio(){ try{ if(window._alkeAudio){window._alkeAudio.el.pause();if(window._alkeAudio.reset)window._alkeAudio.reset();window._alkeAudio=null;} }catch(_){} }
 function render(){
+  stopAlkeAudio();
   const v=document.getElementById('view'); v.innerHTML='';
   // se o usuário não pode ver a aba atual, cai no Meu dia
   if((S.tab==='funil'&&!canTab('funil'))||(S.tab==='servicos'&&!canTab('servicos'))||(S.tab==='conversas'&&!canTab('conversas'))||((S.tab==='meta'||S.tab==='equipe')&&!isAdmin())) S.tab='meudia';
@@ -1676,18 +1678,21 @@ function buildMedia(mm,io){
     const wv=EL('div','wv'); const N=22,bars=[]; for(let i=0;i<N;i++){const bar=EL('i');bar.style.height=(28+Math.round(55*Math.abs(Math.sin(i*1.7+0.5))))+'%';wv.appendChild(bar);bars.push(bar);}
     const tm=EL('div','tm','áudio'); player.appendChild(pp);player.appendChild(wv);player.appendChild(tm);
     const fmtT=(s)=>{s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+    const mid=mm.wa_id||('id'+mm.id);
     let audio=null,loaded=false;
     const resetUI=()=>{pp.textContent='▶';bars.forEach(b=>b.classList.remove('on'));};
+    const wire=()=>{
+      audio.ontimeupdate=()=>{const p=audio.currentTime/(audio.duration||1);bars.forEach((b,i)=>b.classList.toggle('on',i/N<=p));tm.textContent=fmtT((audio.duration||0)-audio.currentTime);};
+      audio.onloadedmetadata=()=>{tm.textContent=fmtT(audio.duration);};
+      audio.onended=()=>{resetUI();tm.textContent=fmtT(audio.duration);if(window._alkeAudio&&window._alkeAudio.el===audio)window._alkeAudio=null;};
+    };
+    // se ESTE áudio sobreviveu a um reload e ainda está tocando, reaproveita (não vira órfão)
+    if(window._alkeAudio&&window._alkeAudio.mid===mid&&window._alkeAudio.el){ audio=window._alkeAudio.el;loaded=true;window._alkeAudio.reset=resetUI;wire();pp.textContent=audio.paused?'▶':'⏸';if(audio.duration)tm.textContent=fmtT((audio.duration||0)-audio.currentTime); }
     pp.onclick=async()=>{
-      if(!loaded){ pp.textContent='…'; const url=await resolveMedia(mm); if(!url){pp.textContent='✕';tm.textContent='indisp.';return;} audio=new Audio(url);loaded=true;
-        audio.ontimeupdate=()=>{const p=audio.currentTime/(audio.duration||1);bars.forEach((b,i)=>b.classList.toggle('on',i/N<=p));tm.textContent=fmtT((audio.duration||0)-audio.currentTime);};
-        audio.onloadedmetadata=()=>{tm.textContent=fmtT(audio.duration);};
-        audio.onended=()=>{resetUI();tm.textContent=fmtT(audio.duration);if(window._alkeAudio&&window._alkeAudio.el===audio)window._alkeAudio=null;};
-      }
+      if(!loaded){ pp.textContent='…'; const url=await resolveMedia(mm); if(!url){pp.textContent='✕';tm.textContent='indisp.';return;} audio=new Audio(url);loaded=true;wire(); }
       if(audio.paused){
-        // para qualquer outro áudio tocando (só 1 por vez)
         if(window._alkeAudio&&window._alkeAudio.el!==audio){ try{window._alkeAudio.el.pause();}catch(_){} if(window._alkeAudio.reset)window._alkeAudio.reset(); }
-        audio.play();pp.textContent='⏸'; window._alkeAudio={el:audio,reset:resetUI};
+        audio.play();pp.textContent='⏸'; window._alkeAudio={el:audio,reset:resetUI,mid:mid};
       } else { audio.pause();pp.textContent='▶'; }
     };
     wrap.appendChild(player);
@@ -1887,8 +1892,8 @@ function viewConversas(){
   const left=EL('div','walist'); const right=EL('div','wachat');
   const sb2=EL('div','walsearch'); const search=document.createElement('input');search.type='text';search.placeholder='Buscar conversa';search.style.cssText='width:100%;padding:9px 11px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';sb2.appendChild(search);left.appendChild(sb2);
   const rows=EL('div','walrows'); left.appendChild(rows);
-  const showEmpty=()=>{ right.innerHTML=''; const e=EL('div');e.style.cssText='margin:auto;text-align:center;color:var(--muted);font-size:14px;padding:30px';e.textContent='Escolha uma conversa à esquerda.';right.appendChild(e); layout.classList.remove('showchat'); S.convSel=null; drawRows(); };
-  const openIn=async(tel)=>{ S.convSel=tel; layout.classList.add('showchat'); right.innerHTML=''; right.appendChild(Object.assign(EL('div','muted'),{textContent:'Abrindo…',style:'margin:auto'})); const el=await threadView(tel,{onBack:showEmpty,onSent:drawRows}); right.innerHTML=''; right.appendChild(el); if(el._toBottom)el._toBottom(); drawRows(); };
+  const showEmpty=()=>{ stopAlkeAudio(); right.innerHTML=''; const e=EL('div');e.style.cssText='margin:auto;text-align:center;color:var(--muted);font-size:14px;padding:30px';e.textContent='Escolha uma conversa à esquerda.';right.appendChild(e); layout.classList.remove('showchat'); S.convSel=null; drawRows(); };
+  const openIn=async(tel)=>{ stopAlkeAudio(); S.convSel=tel; layout.classList.add('showchat'); right.innerHTML=''; right.appendChild(Object.assign(EL('div','muted'),{textContent:'Abrindo…',style:'margin:auto'})); const el=await threadView(tel,{onBack:showEmpty,onSent:drawRows}); right.innerHTML=''; right.appendChild(el); if(el._toBottom)el._toBottom(); drawRows(); };
   const drawRows=()=>{ rows.innerHTML=''; updCnt();
     const q=search.value.trim().toLowerCase();
     const arr=(S.conversas||[]).slice().sort((a,b)=>new Date(b.ultima_em||0)-new Date(a.ultima_em||0)).filter(c=>{const nm=nomeDaConversa(c).toLowerCase();return !q||nm.includes(q)||(c.telefone||'').includes(q);});
@@ -1928,7 +1933,7 @@ async function openConversa(telefone){
   const m=EL('div','modal big');
   m.style.height='min(80vh,640px)'; m.style.maxHeight='100%'; m.style.display='flex'; m.style.flexDirection='column'; m.style.padding='0'; m.style.overflow='hidden';
   const ov=overlay(m);
-  const el=await threadView(telefone,{onBack:()=>ov.remove(),alwaysBack:true,closeOverlay:()=>ov.remove()});
+  const el=await threadView(telefone,{onBack:()=>{stopAlkeAudio();ov.remove();},alwaysBack:true,closeOverlay:()=>{stopAlkeAudio();ov.remove();}});
   el.style.height='100%'; el.style.minHeight='0'; el.style.flex='1 1 0';
   m.appendChild(el); if(el._toBottom)el._toBottom();
   if(mobile) bindKeyboard(ov);  // overlay acompanha o teclado => pop-up centraliza na area visível acima do teclado
