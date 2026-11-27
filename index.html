@@ -1677,13 +1677,18 @@ function buildMedia(mm,io){
     const tm=EL('div','tm','áudio'); player.appendChild(pp);player.appendChild(wv);player.appendChild(tm);
     const fmtT=(s)=>{s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
     let audio=null,loaded=false;
+    const resetUI=()=>{pp.textContent='▶';bars.forEach(b=>b.classList.remove('on'));};
     pp.onclick=async()=>{
       if(!loaded){ pp.textContent='…'; const url=await resolveMedia(mm); if(!url){pp.textContent='✕';tm.textContent='indisp.';return;} audio=new Audio(url);loaded=true;
         audio.ontimeupdate=()=>{const p=audio.currentTime/(audio.duration||1);bars.forEach((b,i)=>b.classList.toggle('on',i/N<=p));tm.textContent=fmtT((audio.duration||0)-audio.currentTime);};
         audio.onloadedmetadata=()=>{tm.textContent=fmtT(audio.duration);};
-        audio.onended=()=>{pp.textContent='▶';bars.forEach(b=>b.classList.remove('on'));tm.textContent=fmtT(audio.duration);};
+        audio.onended=()=>{resetUI();tm.textContent=fmtT(audio.duration);if(window._alkeAudio&&window._alkeAudio.el===audio)window._alkeAudio=null;};
       }
-      if(audio.paused){audio.play();pp.textContent='⏸';}else{audio.pause();pp.textContent='▶';}
+      if(audio.paused){
+        // para qualquer outro áudio tocando (só 1 por vez)
+        if(window._alkeAudio&&window._alkeAudio.el!==audio){ try{window._alkeAudio.el.pause();}catch(_){} if(window._alkeAudio.reset)window._alkeAudio.reset(); }
+        audio.play();pp.textContent='⏸'; window._alkeAudio={el:audio,reset:resetUI};
+      } else { audio.pause();pp.textContent='▶'; }
     };
     wrap.appendChild(player);
   } else if(tp==='video'){
@@ -1751,7 +1756,7 @@ async function threadView(telefone, opts){
         const isInsert = payload&&payload.eventType==='INSERT';
         loadMsgs().then(()=>{ if(isInsert&&perto&&wrap._toBottom)wrap._toBottom(); });
       }).subscribe();
-    try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(wrap)){ try{sb.removeChannel(chan);}catch(_){} mo.disconnect(); } }); mo.observe(document.body,{childList:true,subtree:true}); }catch(_){}
+    try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(wrap)){ try{sb.removeChannel(chan);}catch(_){} try{ if(window._alkeAudio){window._alkeAudio.el.pause();if(window._alkeAudio.reset)window._alkeAudio.reset();window._alkeAudio=null;} }catch(_){} mo.disconnect(); } }); mo.observe(document.body,{childList:true,subtree:true}); }catch(_){}
   }catch(_){}
   // marca "EU estou atendendo" (só interno, pros outros não responderem junto) + limpa ao sair
   try{
