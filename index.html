@@ -1665,8 +1665,9 @@ async function threadView(telefone, opts){
       if(apagada){ const di=EL('div');di.textContent='🚫 Mensagem apagada';di.style.cssText='font-style:italic;color:var(--muted)';b.appendChild(di); }
       else if(MIDIAS.includes(mm.tipo)){ b.appendChild(buildMedia(mm,io)); if(mm.texto&&mm.texto[0]!=='['&&mm.tipo!=='document'&&mm.tipo!=='doc'){ b.appendChild(Object.assign(EL('div'),{textContent:mm.texto,style:'margin-top:4px'})); } }
       else { const ml=midiaLabel(mm.tipo,mm.texto); if(ml){const mi=EL('div');mi.textContent=ml;mi.style.cssText='font-style:italic;color:var(--muted)';b.appendChild(mi);} else b.appendChild(document.createTextNode(mm.texto||'')); }
-      const tm=EL('div');tm.style.cssText='font-size:10px;color:var(--muted);margin-top:2px;text-align:right';
-      tm.textContent=(mine&&mm.enviado_por?mm.enviado_por+' · ':'')+(mm.criado_em?hhmm(new Date(mm.criado_em)):'');
+      const tm=EL('div');tm.style.cssText='font-size:10px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:3px;justify-content:flex-end';
+      tm.appendChild(document.createTextNode((mine&&mm.enviado_por?mm.enviado_por+' · ':'')+(mm.criado_em?hhmm(new Date(mm.criado_em)):'')));
+      if(mine&&!apagada){ const st=mm.status||1; const tk=EL('span');tk.textContent=(st>=2?'✓✓':'✓');tk.style.cssText='font-size:11px;font-weight:700;'+(st>=3?'color:#34B7F1':'color:var(--muted)');tk.title=(st>=3?'Lida':st>=2?'Entregue':'Enviada');tm.appendChild(tk); }
       b.appendChild(tm); body.appendChild(b);
       if(!apagada){ // menu de ações: segurar (mobile), botão direito (pc), ou tocar no ⋯
         let pt=null; const op=(e)=>{if(e)e.preventDefault();menuFor(mm);};
@@ -1685,9 +1686,10 @@ async function threadView(telefone, opts){
   // TEMPO REAL: nova mensagem (recebida ou enviada de qualquer telefone/sistema) aparece na hora
   try{
     const chan=sb.channel('msgs-'+tel+'-'+Date.now())
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'mensagens',filter:'telefone=eq.'+tel},()=>{
+      .on('postgres_changes',{event:'*',schema:'public',table:'mensagens',filter:'telefone=eq.'+tel},(payload)=>{
         const b=wrap.querySelector('.wabody'); const perto = b ? (b.scrollHeight-b.scrollTop-b.clientHeight < 120) : true;
-        loadMsgs().then(()=>{ if(perto&&wrap._toBottom)wrap._toBottom(); });
+        const isInsert = payload&&payload.eventType==='INSERT';
+        loadMsgs().then(()=>{ if(isInsert&&perto&&wrap._toBottom)wrap._toBottom(); });
       }).subscribe();
     try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(wrap)){ try{sb.removeChannel(chan);}catch(_){} mo.disconnect(); } }); mo.observe(document.body,{childList:true,subtree:true}); }catch(_){}
   }catch(_){}
