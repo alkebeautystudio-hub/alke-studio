@@ -1592,8 +1592,13 @@ function viewAniversarios(){
 // ---------- CONVERSAS (WhatsApp via FZAP) ----------
 async function fzapCall(action,extra){ try{ const {data}=await sb.functions.invoke('fzap-api',{body:Object.assign({action},extra||{})}); return data||{}; }catch(e){ return {error:String(e)}; } }
 // ao agendar, manda o link de cadastro no WhatsApp (uma vez por cliente, se ainda não completou)
+function temCadastroBasico(l){ const nomeOk=l.nome && !/^Cliente \d{4}$/.test(l.nome) && l.nome.trim().length>=2; return !!(nomeOk && l.telefone && l.nascimento); }
 async function enviarLinkCadastro(leadId, inicioISO){
-  const l=S.leads.find(x=>x.id===leadId); if(!l||!l.telefone||l.cadastro_completo||l.link_cadastro_em) return;
+  const l=S.leads.find(x=>x.id===leadId); if(!l||!l.telefone) return;
+  // só manda pra quem AINDA não tem cadastro básico (Nome + número + data de nascimento)
+  if(l.cadastro_completo || temCadastroBasico(l)) return;
+  // evita re-enviar no mesmo dia (se agendar vários serviços juntos)
+  if(l.link_cadastro_em && (Date.now()-new Date(l.link_cadastro_em).getTime()) < 20*3600*1000) return;
   const tel=l.telefone.replace(/\D/g,''); if(tel.length<10) return;
   const prim=(l.nome||'').split(' ')[0]||'';
   const link='https://alkebeautystudio-hub.github.io/alke-studio/cadastro.html?tel=55'+tel.replace(/^55/,'')+(prim?('&nome='+encodeURIComponent(prim)):'');
