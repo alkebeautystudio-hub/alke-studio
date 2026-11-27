@@ -2144,23 +2144,31 @@ function openCliente(c){
 
 function viewEquipe(){
   const w=EL('div'); w.appendChild(pageHead('Equipe'));
-  w.appendChild(EL('p','muted','Cadastre as profissionais, defina cor e papel, e crie o acesso (login) de cada uma.'));
+  w.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:4px;font-size:13.5px',textContent:'Cada profissional: nome, cor na agenda, papel, e-mail de acesso e aniversário. Crie o login e reset de senha aqui mesmo.'}));
   S.pros.forEach(p=>{
-    const pan=EL('div','panel'); pan.style.marginTop='12px';
-    const r1=EL('div','row'); r1.style.gap='9px';
-    const nm=document.createElement('input');nm.value=p.nome;nm.style.cssText='flex:1;min-width:130px;padding:9px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';
-    nm.onchange=()=>sb.from('profissionais').update({nome:nm.value}).eq('id',p.id);
-    const cor=document.createElement('input');cor.type='color';cor.value=p.cor||'#A8823A';cor.style.cssText='width:46px;height:40px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);padding:2px';
-    cor.onchange=()=>sb.from('profissionais').update({cor:cor.value}).eq('id',p.id);
+    const pan=EL('div','panel'); pan.style.marginTop='14px';
+    // cabeçalho: avatar colorido + nome + papel
+    const ini=(x)=>{const s=(x||'').trim();return s?s[0].toUpperCase():'?';};
+    const r1=EL('div');r1.style.cssText='display:flex;align-items:center;gap:12px';
+    const ava=EL('div');ava.style.cssText='width:46px;height:46px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;box-shadow:0 2px 6px rgba(40,28,20,.18);background:'+(p.cor||'#A8823A');ava.textContent=ini(p.nome);
+    const nm=document.createElement('input');nm.value=p.nome||'';nm.placeholder='Nome da profissional';nm.style.cssText='flex:1 1 auto;min-width:0;font-weight:700;font-size:15px;padding:9px 11px;border:1px solid var(--line2);border-radius:10px;background:var(--bg);color:var(--ink)';
+    nm.onchange=()=>{p.nome=nm.value;sb.from('profissionais').update({nome:nm.value}).eq('id',p.id);ava.textContent=ini(nm.value);};
     const papel=sel([['socia','Sócia'],['prof','Profissional'],['admin','Admin']], p.admin?'admin':(p.socia?'socia':'prof'));
-    papel.style.cssText='padding:9px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';
+    papel.style.cssText='flex:0 0 auto;padding:9px 11px;border:1px solid var(--line2);border-radius:10px;background:var(--bg);color:var(--ink);font-weight:600';
     papel.onchange=()=>sb.from('profissionais').update({admin:papel.value==='admin',socia:papel.value==='socia'}).eq('id',p.id).then(()=>loadAll());
-    r1.appendChild(nm);r1.appendChild(cor);r1.appendChild(papel);pan.appendChild(r1);
-    // e-mail (Google) — usado pros convites da agenda e pro login
-    const em=document.createElement('input');em.type='email';em.value=p.email||'';em.placeholder='e-mail Google (convite da agenda + login)';
-    em.style.cssText='width:100%;margin-top:9px;padding:9px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--bg);color:var(--ink)';
-    em.onchange=()=>sb.from('profissionais').update({email:em.value.trim()||null}).eq('id',p.id);
-    pan.appendChild(em);
+    r1.appendChild(ava);r1.appendChild(nm);r1.appendChild(papel);pan.appendChild(r1);
+    // grade de dados: cor · e-mail · nascimento
+    const grid=EL('div');grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(152px,1fr));gap:11px;margin-top:13px';
+    const cor=document.createElement('input');cor.type='color';cor.value=p.cor||'#A8823A';cor.style.cssText='width:100%;height:42px;border:1px solid var(--line2);border-radius:10px;background:var(--bg);padding:3px;cursor:pointer';
+    cor.onchange=()=>{p.cor=cor.value;sb.from('profissionais').update({cor:cor.value}).eq('id',p.id);ava.style.background=cor.value;};
+    grid.appendChild(field('Cor dela',cor));
+    const em=document.createElement('input');em.type='email';em.value=p.email||'';em.placeholder='email@gmail.com';
+    em.onchange=()=>{p.email=em.value.trim()||null;sb.from('profissionais').update({email:p.email}).eq('id',p.id);};
+    grid.appendChild(field('E-mail (login + convite da agenda)',em));
+    const nasc=document.createElement('input');nasc.type='date';nasc.value=p.nascimento||'';
+    nasc.onchange=()=>{p.nascimento=nasc.value||null;sb.from('profissionais').update({nascimento:p.nascimento}).eq('id',p.id);};
+    grid.appendChild(field('Data de nascimento',nasc));
+    pan.appendChild(grid);
     // só pra PROFISSIONAL (não-sócia, não-admin): % do studio + permissões
     if(!p.admin && !p.socia){
       const pctWrap=EL('div'); pctWrap.style.cssText='margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap';
@@ -2184,18 +2192,21 @@ function viewEquipe(){
       permWrap.appendChild(mkPerm('conversas','Conversas (WhatsApp)',false));
       pan.appendChild(permWrap);
     }
-    const r2=EL('div','row spread'); r2.style.marginTop='11px';
-    r2.appendChild(Object.assign(EL('div','muted'),{style:'font-size:13px',textContent:p.user_id?'✓ Tem acesso (login criado)':'Sem login ainda'}));
-    const btns=EL('div','row');
+    const r2=EL('div','row spread'); r2.style.cssText='margin-top:14px;padding-top:13px;border-top:1px solid var(--line);align-items:center;flex-wrap:wrap;gap:9px';
+    const stat=EL('span');stat.textContent=p.user_id?'✓ Login criado':'Sem login ainda';
+    stat.style.cssText='font-size:12px;font-weight:700;padding:4px 11px;border-radius:999px;'+(p.user_id?'color:var(--win);background:color-mix(in srgb,var(--win) 14%,transparent)':'color:var(--muted);background:var(--surface2)');
+    r2.appendChild(stat);
+    const btns=EL('div','row');btns.style.gap='8px';
     if(p.user_id){const rs=EL('button','btn ghost sm','Resetar senha');rs.onclick=()=>loginModal(p,'reset');btns.appendChild(rs);}
     else{const cl=EL('button','btn sm','Criar login');cl.onclick=()=>loginModal(p,'create');btns.appendChild(cl);}
     if(!p.admin){const del=EL('button','btn ghost sm','Excluir');del.style.color='var(--alert)';del.onclick=async()=>{if(!confirm('Excluir '+(p.nome||'profissional')+'? Os atendimentos já feitos continuam no histórico.'))return;const {error}=await sb.from('profissionais').delete().eq('id',p.id);if(error){alert('Não consegui excluir agora — ela deve ter serviços ou agendamentos ligados. Apague-os antes, ou me chame.');return;}await loadAll();render()};btns.appendChild(del);}
     r2.appendChild(btns); pan.appendChild(r2);
     w.appendChild(pan);
   });
-  const add=EL('button','btn ghost sm','+ Profissional');add.style.marginTop='14px';
+  const add=EL('button','btn ghost','+ Adicionar profissional');add.style.cssText='margin-top:16px;width:100%';
   add.onclick=async()=>{await sb.from('profissionais').insert({nome:'Nova profissional',ordem:S.pros.length});await loadAll();render()};
   w.appendChild(add);
+  w.appendChild(Object.assign(EL('div'),{style:'height:40px'})); // respiro pra barra de baixo não cortar
   return w;
 }
 function loginModal(p,mode){
