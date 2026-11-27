@@ -1632,6 +1632,8 @@ async function enviarLinkCadastro(leadId, inicioISO){
 }
 function telLabel(t){ const d=String(t||'').replace(/\D/g,''); const n=d.replace(/^55/,''); if(n.length>=10){const ddd=n.slice(0,2),rest=n.slice(2); return '('+ddd+') '+rest.slice(0,rest.length-4)+'-'+rest.slice(-4);} return String(t||''); }
 function nomeDaConversa(c){ const key=(c.telefone||'').replace(/\D/g,''); const l=S.leads.find(x=>x.telefone&&x.telefone.replace(/\D/g,'')===key); return (l&&l.nome)||c.nome||telLabel(c.telefone); }
+// quem está atendendo esta conversa AGORA (só interno, cliente não vê) — se for outra pessoa e recente (<45s)
+function atendendoLabel(c){ if(!c||!c.atendendo_por||!c.atendendo_em)return null; const me=(S.me&&S.me.nome)||''; if(c.atendendo_por===me)return null; const ago=Date.now()-new Date(c.atendendo_em).getTime(); if(ago>45000)return null; return c.atendendo_por; }
 const _avTried={};
 // bolinha de avatar: mostra foto se tiver (cacheada), senão inicial. fetchAvatar=true busca no WhatsApp (só na conversa aberta)
 function avatarEl(c,size,fetchAvatar){ size=size||38;
@@ -1704,7 +1706,9 @@ async function threadView(telefone, opts){
   head.appendChild(avatarEl(c,40,true));
   const hi=EL('div');hi.style.minWidth='0';
   hi.appendChild(Object.assign(EL('div'),{textContent:nomeDaConversa(c),style:'font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
-  hi.appendChild(Object.assign(EL('div','muted'),{textContent:telLabel(tel),style:'font-size:12px'}));
+  const _atl=atendendoLabel(c);
+  if(_atl) hi.appendChild(Object.assign(EL('div'),{textContent:'🟠 '+_atl+' está atendendo',style:'font-size:11.5px;color:var(--warn);font-weight:700'}));
+  else hi.appendChild(Object.assign(EL('div','muted'),{textContent:telLabel(tel),style:'font-size:12px'}));
   head.appendChild(hi);
   const sp=EL('div');sp.style.marginLeft='auto';head.appendChild(sp);
   const unb=EL('button','btn ghost sm','●');unb.title='Marcar como não lida';unb.style.fontSize='10px';unb.onclick=async()=>{ await fzapCall('markunread',{phone:tel}); const cc=(S.conversas||[]).find(x=>(x.telefone||'').replace(/\D/g,'')===tel); if(cc)cc.nao_lidas=1; if(opts.onSent)opts.onSent(); if(opts.onBack)opts.onBack(); };head.appendChild(unb);
@@ -1748,6 +1752,14 @@ async function threadView(telefone, opts){
         loadMsgs().then(()=>{ if(isInsert&&perto&&wrap._toBottom)wrap._toBottom(); });
       }).subscribe();
     try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(wrap)){ try{sb.removeChannel(chan);}catch(_){} mo.disconnect(); } }); mo.observe(document.body,{childList:true,subtree:true}); }catch(_){}
+  }catch(_){}
+  // marca "EU estou atendendo" (só interno, pros outros não responderem junto) + limpa ao sair
+  try{
+    const meNome=(S.me&&S.me.nome)||'';
+    const setAt=()=>{ try{sb.from('conversas').update({atendendo_por:meNome,atendendo_em:new Date().toISOString()}).eq('telefone',telefone);}catch(_){} };
+    const clearAt=()=>{ try{sb.from('conversas').update({atendendo_por:null,atendendo_em:null}).eq('telefone',telefone);}catch(_){} };
+    setAt(); const atInt=setInterval(setAt,20000);
+    try{ const mo2=new MutationObserver(()=>{ if(!document.body.contains(wrap)){ clearInterval(atInt); clearAt(); mo2.disconnect(); } }); mo2.observe(document.body,{childList:true,subtree:true}); }catch(_){}
   }catch(_){}
   let replyTo=null, replyBar=null;
   function renderReplyBar(){ if(!replyBar)return; if(!replyTo){replyBar.style.display='none';replyBar.innerHTML='';return;} replyBar.style.display='flex'; replyBar.innerHTML='';
@@ -1885,7 +1897,9 @@ function viewConversas(){
       l1.appendChild(Object.assign(EL('div'),{textContent:nomeDaConversa(c),style:'font-weight:'+(unread?'700':'600')+';color:'+(unread?'var(--ink)':'inherit')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto'}));
       if(unread){const b=EL('span');b.textContent=c.nao_lidas;b.style.cssText='background:var(--win);color:#fff;font-size:11.5px;font-weight:700;min-width:20px;height:20px;border-radius:999px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto';l1.appendChild(b);}
       mid.appendChild(l1);
-      mid.appendChild(Object.assign(EL('div','muted'),{textContent:(c.ultima_msg||'').slice(0,42),style:'font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
+      const _atl=atendendoLabel(c);
+      if(_atl) mid.appendChild(Object.assign(EL('div'),{textContent:'🟠 '+_atl+' está atendendo',style:'font-size:12px;color:var(--warn);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
+      else mid.appendChild(Object.assign(EL('div','muted'),{textContent:(c.ultima_msg||'').slice(0,42),style:'font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
       row.appendChild(av);row.appendChild(mid);
       row.onclick=()=>openIn(c.telefone);
       rows.appendChild(row);
