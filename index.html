@@ -385,6 +385,24 @@ function setupGlobalRealtime(){
       .subscribe();
   }catch(_){}
 }
+// ATUALIZAÇÃO GERAL: ao abrir/voltar pro app ou quando a internet volta, puxa tudo de novo
+// (cobre o tempo em que o app ficou fechado ou a net caiu; enquanto aberto, o tempo real acima cuida)
+let _resyncT=null;
+async function resyncTudo(){
+  try{ const {data:{session}}=await sb.auth.getSession(); if(!session)return; }catch(_){ return; }
+  setupGlobalRealtime();                 // reconecta os canais de tempo real (podem ter morrido na queda)
+  await loadAll();                        // puxa card, funil, conversas, financeiro… tudo fresco
+  try{ if(typeof window._alkeThreadReload==='function') await window._alkeThreadReload(); }catch(_){} // conversa aberta recarrega
+  const busy = document.querySelector('.ov') || (S.tab==='conversas' && S.convSel);
+  if(!busy){ try{ render(); renderShell(); }catch(_){} }
+  else { try{ renderShell(); }catch(_){} } // ao menos os contadores/avisos no topo
+}
+function agendarResync(){ clearTimeout(_resyncT); _resyncT=setTimeout(resyncTudo,250); }
+try{
+  window.addEventListener('online', agendarResync);                               // internet voltou
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') agendarResync(); }); // voltou pro app
+  window.addEventListener('focus', agendarResync);                                // reforço (foco na aba/janela)
+}catch(_){}
 async function loadAll(){
   const [pros,serv,prec,leads,fin,cfg,desp,ags,cvs]=await Promise.all([
     sb.from('profissionais').select('*').order('ordem'),
@@ -1753,6 +1771,7 @@ async function threadView(telefone, opts){
   wrap._toBottom=()=>{requestAnimationFrame(()=>{body.scrollTop=body.scrollHeight;});};
   try{ await sb.from('conversas').update({nao_lidas:0}).eq('telefone',telefone); const cc=(S.conversas||[]).find(x=>x.telefone===telefone); if(cc)cc.nao_lidas=0; }catch(_){}
   await loadMsgs();
+  window._alkeThreadReload=loadMsgs; // gancho: ressincroniza a conversa aberta quando a net volta
   // TEMPO REAL: nova mensagem (recebida ou enviada de qualquer telefone/sistema) aparece na hora
   try{
     const chan=sb.channel('msgs-'+tel+'-'+Date.now())
@@ -1761,7 +1780,7 @@ async function threadView(telefone, opts){
         const isInsert = payload&&payload.eventType==='INSERT';
         loadMsgs().then(()=>{ if(isInsert&&perto&&wrap._toBottom)wrap._toBottom(); });
       }).subscribe();
-    try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(wrap)){ try{sb.removeChannel(chan);}catch(_){} try{ if(window._alkeAudio){window._alkeAudio.el.pause();if(window._alkeAudio.reset)window._alkeAudio.reset();window._alkeAudio=null;} }catch(_){} mo.disconnect(); } }); mo.observe(document.body,{childList:true,subtree:true}); }catch(_){}
+    try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(wrap)){ try{sb.removeChannel(chan);}catch(_){} if(window._alkeThreadReload===loadMsgs)window._alkeThreadReload=null; try{ if(window._alkeAudio){window._alkeAudio.el.pause();if(window._alkeAudio.reset)window._alkeAudio.reset();window._alkeAudio=null;} }catch(_){} mo.disconnect(); } }); mo.observe(document.body,{childList:true,subtree:true}); }catch(_){}
   }catch(_){}
   // marca "EU estou atendendo" (só interno, pros outros não responderem junto) + limpa ao sair
   try{
