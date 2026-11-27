@@ -507,6 +507,15 @@ function searchBox(input,wrapCss){
   input.addEventListener('input',upd); upd();
   w.appendChild(input);w.appendChild(x); return w;
 }
+// campo de data no padrão BR (17/03/1997), guarda ISO no banco. onISO recebe 'aaaa-mm-dd' ou null
+function brDateField(isoVal,onISO){
+  const i=document.createElement('input');i.type='text';i.inputMode='numeric';i.placeholder='dd/mm/aaaa';i.maxLength=10;
+  const toBR=(iso)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(iso||'');return m?(m[3]+'/'+m[2]+'/'+m[1]):'';};
+  i.value=toBR(isoVal);
+  i.oninput=()=>{let v=i.value.replace(/\D/g,'').slice(0,8); if(v.length>=5)v=v.slice(0,2)+'/'+v.slice(2,4)+'/'+v.slice(4); else if(v.length>=3)v=v.slice(0,2)+'/'+v.slice(2); i.value=v;};
+  i.onchange=()=>{const m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(i.value.trim());onISO(m?(m[3]+'-'+m[2]+'-'+m[1]):null);};
+  return i;
+}
 // adiciona o olho na senha da tela de login inicial
 function enhanceLoginPw(){ const s=document.getElementById('senha'); if(!s||s.dataset.eyed)return; s.dataset.eyed='1';
   const parent=s.parentNode, next=s.nextSibling; s.style.marginBottom='0';
@@ -2204,8 +2213,7 @@ function viewEquipe(){
     const cor=document.createElement('input');cor.type='color';cor.value=p.cor||'#A8823A';cor.style.cssText='width:100%;height:42px;border:1px solid var(--line2);border-radius:12px;background:var(--bg);padding:3px;cursor:pointer';
     cor.onchange=()=>{p.cor=cor.value;sb.from('profissionais').update({cor:cor.value}).eq('id',p.id);ava.style.background=cor.value;};
     grid.appendChild(field('Cor na agenda',cor));
-    const nasc=document.createElement('input');nasc.type='date';nasc.value=p.nascimento||'';
-    nasc.onchange=()=>{p.nascimento=nasc.value||null;sb.from('profissionais').update({nascimento:p.nascimento}).eq('id',p.id);};
+    const nasc=brDateField(p.nascimento,(iso)=>{p.nascimento=iso;sb.from('profissionais').update({nascimento:iso}).eq('id',p.id);});
     grid.appendChild(field('Data de nascimento',nasc));
     pan.appendChild(grid);
     // só pra PROFISSIONAL (não-sócia, não-admin): % do studio + permissões
