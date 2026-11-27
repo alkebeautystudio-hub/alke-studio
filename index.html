@@ -2243,12 +2243,11 @@ function viewEquipe(){
     const acc=EL('div');acc.style.cssText='margin-top:16px;padding-top:15px;border-top:1px solid var(--line)';
     acc.appendChild(Object.assign(EL('div','eyebrow'),{textContent:'Acesso',style:'display:block;margin-bottom:9px'}));
     if(p.user_id){
-      // tem login: mostra o e-mail (login + convite da agenda), editável
-      const em=document.createElement('input');em.type='email';em.value=p.email||'';em.placeholder='email@gmail.com';
-      em.onchange=()=>{p.email=em.value.trim()||null;sb.from('profissionais').update({email:p.email}).eq('id',p.id);};
-      acc.appendChild(field('E-mail (login + convite da agenda)',em));
-      const row=EL('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:4px';
-      const tag=EL('span');tag.textContent='✓ Login criado';tag.style.cssText='font-size:12px;font-weight:700;color:var(--win);background:color-mix(in srgb,var(--win) 14%,transparent);padding:4px 11px;border-radius:999px';
+      // COM login: e-mail some (o do login já serve pro convite). Mostra só a info.
+      const em=(p.email||'—');
+      acc.appendChild(Object.assign(EL('div'),{textContent:em,style:'font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}));
+      const row=EL('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px';
+      const tag=EL('span');tag.textContent='✓ Login criado · recebe o convite da agenda';tag.style.cssText='font-size:12px;font-weight:700;color:var(--win)';
       row.appendChild(tag);
       const accbtns=EL('div','row');accbtns.style.cssText='gap:8px;flex:0 0 auto';
       const lo=EL('button','btn ghost sm','Deslogar');lo.onclick=async()=>{ if(!confirm('Deslogar '+(p.nome||'ela')+' de todos os aparelhos? Ela vai precisar entrar de novo com a senha.'))return; lo.textContent='Saindo…'; const {data,error}=await sb.functions.invoke('admin-users',{body:{action:'logout',profissional_id:p.id}}); const err=(data&&data.error)||(error&&error.message); lo.textContent='Deslogar'; if(err){alert('Erro: '+err);return;} alert((p.nome||'Ela')+' foi deslogada. Na próxima vez que o app dela abrir, vai pedir login.'); };
@@ -2256,12 +2255,12 @@ function viewEquipe(){
       accbtns.appendChild(lo);accbtns.appendChild(rs);row.appendChild(accbtns);
       acc.appendChild(row);
     } else {
-      // sem login: só o convite pra criar (o e-mail é pedido na hora de criar)
-      const row=EL('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap';
-      const info=EL('div');info.style.cssText='flex:1 1 180px;min-width:0';
-      info.appendChild(Object.assign(EL('div'),{textContent:'Sem login ainda',style:'font-weight:600;font-size:14px'}));
-      info.appendChild(Object.assign(EL('div','muted'),{textContent:'O e-mail que você colocar ao criar vira o login dela e o convite da agenda.',style:'font-size:12px;margin-top:2px'}));
-      row.appendChild(info);
+      // SEM login: campo de e-mail aparece (ela recebe convite da agenda mesmo sem ter login)
+      const em=document.createElement('input');em.type='email';em.value=p.email||'';em.placeholder='email@gmail.com';
+      em.onchange=()=>{p.email=em.value.trim()||null;sb.from('profissionais').update({email:p.email}).eq('id',p.id);};
+      acc.appendChild(field('E-mail (recebe o convite da agenda)',em));
+      const row=EL('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:4px';
+      row.appendChild(Object.assign(EL('div','muted'),{textContent:'Sem login — só recebe convites no e-mail acima. Crie o login se ela for acessar o app.',style:'font-size:12px;flex:1 1 180px;min-width:0'}));
       const cl=EL('button','btn sm','Criar login');cl.style.flex='0 0 auto';cl.onclick=()=>loginModal(p,'create');row.appendChild(cl);
       acc.appendChild(row);
     }
