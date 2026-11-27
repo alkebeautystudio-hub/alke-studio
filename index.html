@@ -395,7 +395,7 @@ async function loadAll(){
     sb.from('studio_config').select('*').eq('id',1).maybeSingle(),
     sb.from('despesas').select('*'),
     sb.from('agendamentos').select('*'),
-    sb.from('conversas').select('*').order('ultima_em',{ascending:false}),
+    sb.from('conversas').select('*').order('ultima_em',{ascending:false,nullsFirst:false}),
   ]);
   S.pros=pros.data||[]; S.servicos=serv.data||[];
   S.precos={}; (prec.data||[]).forEach(p=>S.precos[p.servico_id]=p);
@@ -1886,7 +1886,7 @@ function viewConversas(){
   const openIn=async(tel)=>{ S.convSel=tel; layout.classList.add('showchat'); right.innerHTML=''; right.appendChild(Object.assign(EL('div','muted'),{textContent:'Abrindo…',style:'margin:auto'})); const el=await threadView(tel,{onBack:showEmpty,onSent:drawRows}); right.innerHTML=''; right.appendChild(el); if(el._toBottom)el._toBottom(); drawRows(); };
   const drawRows=()=>{ rows.innerHTML=''; updCnt();
     const q=search.value.trim().toLowerCase();
-    const arr=(S.conversas||[]).filter(c=>{const nm=nomeDaConversa(c).toLowerCase();return !q||nm.includes(q)||(c.telefone||'').includes(q);});
+    const arr=(S.conversas||[]).slice().sort((a,b)=>new Date(b.ultima_em||0)-new Date(a.ultima_em||0)).filter(c=>{const nm=nomeDaConversa(c).toLowerCase();return !q||nm.includes(q)||(c.telefone||'').includes(q);});
     if(!arr.length){rows.appendChild(Object.assign(EL('div','muted'),{textContent:'Nenhuma conversa ainda.',style:'padding:16px;font-size:13px;text-align:center'}));return;}
     arr.forEach(c=>{ const row=EL('div','warow'+(S.convSel&&(c.telefone||'').replace(/\D/g,'')===String(S.convSel).replace(/\D/g,'')?' on':''));
       const av=avatarEl(c,38,false);
@@ -1912,7 +1912,7 @@ function viewConversas(){
   try{
     const chan=sb.channel('convs-'+Date.now())
       .on('postgres_changes',{event:'*',schema:'public',table:'conversas'},()=>{
-        sb.from('conversas').select('*').order('ultima_em',{ascending:false}).then(({data})=>{ if(data){S.conversas=data;drawRows();try{renderShell();}catch(_){}} });
+        sb.from('conversas').select('*').order('ultima_em',{ascending:false,nullsFirst:false}).then(({data})=>{ if(data){S.conversas=data;drawRows();try{renderShell();}catch(_){}} });
       }).subscribe();
     try{ const mo=new MutationObserver(()=>{ if(!document.body.contains(w)){ try{sb.removeChannel(chan);}catch(_){} mo.disconnect(); } }); mo.observe(document.body,{childList:true,subtree:true}); }catch(_){}
   }catch(_){}
