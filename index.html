@@ -387,6 +387,7 @@ function setupGlobalRealtime(){
       .on('postgres_changes',{event:'*',schema:'public',table:'conversas'},reload)
       .on('postgres_changes',{event:'*',schema:'public',table:'servicos'},reload)
       .on('postgres_changes',{event:'*',schema:'public',table:'despesas'},reload)
+      .on('postgres_changes',{event:'*',schema:'public',table:'repasses'},reload)
       .subscribe();
   }catch(_){}
 }
@@ -411,7 +412,7 @@ try{
   window.addEventListener('focus', agendarResync);                                // reforço (foco na aba/janela)
 }catch(_){}
 async function loadAll(){
-  const [pros,serv,prec,leads,fin,cfg,desp,ags,cvs]=await Promise.all([
+  const [pros,serv,prec,leads,fin,cfg,desp,ags,cvs,rps]=await Promise.all([
     sb.from('profissionais').select('*').order('ordem'),
     sb.from('servicos').select('*').order('nome'),
     sb.from('servicos_preco').select('*'),
@@ -421,6 +422,7 @@ async function loadAll(){
     sb.from('despesas').select('*'),
     sb.from('agendamentos').select('*'),
     sb.from('conversas').select('*').order('ultima_em',{ascending:false,nullsFirst:false}),
+    sb.from('repasses').select('*'),
   ]);
   S.pros=pros.data||[]; S.servicos=serv.data||[];
   S.precos={}; (prec.data||[]).forEach(p=>S.precos[p.servico_id]=p);
@@ -430,13 +432,14 @@ async function loadAll(){
   S.despesas=desp.data||[];
   S.agendamentos=ags.data||[];
   S.conversas=cvs.data||[];
+  S.repasses=(rps&&rps.data)||[];
 }
 const proById=id=>S.pros.find(p=>p.id===id)||{};
 const servById=id=>S.servicos.find(s=>s.id===id)||{};
 const isAdmin=()=>!!S.me.admin;
 const isSocia=()=>!!S.me.socia;
 // admin vê tudo; cada um vê o seu; sócia vê também as NÃO-sócias, mas NÃO a outra sócia
-const canMoney=proId=>{ if(isAdmin())return true; if(S.me.id===proId)return true; if(S.me.socia){const p=proById(proId);return !p.socia;} return false; };
+const canMoney=proId=>{ if(isAdmin()||isSocia())return true; if(S.me.id===proId)return true; return false; };
 const canPreco=()=>isAdmin()||isSocia();            // quem vê/edita preço e custo do catálogo
 const pctPro=p=>{const v=Number((p||{}).percentual);return isNaN(v)?30:v};
 const permOf=(p,key)=>{const pm=(p&&p.permissoes)||{}; if(key==='funil')return pm.funil!==false; return !!pm[key];};
@@ -468,6 +471,7 @@ const ICON={
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4M20 20H4M8 16v-4M12 16V8M16 16v-6"/></svg>',
   target:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6"/></svg>',
   crown:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l4 4 5-6 5 6 4-4v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"/></svg>',
+  money:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>',
   plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   camera:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="12.5" rx="2.4"/><path d="M8 7l1.6-2.6h4.8L16 7"/><circle cx="12" cy="13.2" r="3.1"/></svg>',
   mic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>',
@@ -523,6 +527,7 @@ function enhanceLoginPw(){ const s=document.getElementById('senha'); if(!s||s.da
 function renderShell(){
   let tabs=[['meudia','Meu dia',ICON.sun],['funil','Funil',ICON.funnel],['agenda','Agenda',ICON.cal],['clientes','Clientes',ICON.people],['conversas','Conversas',ICON.chat],['aniversarios','Aniversários',ICON.cake],['servicos','Serviços',ICON.tag],['painel','Dashboard',ICON.chart]];
   tabs=tabs.filter(t=>{ if(t[0]==='funil')return canTab('funil'); if(t[0]==='servicos')return canTab('servicos'); if(t[0]==='conversas')return canTab('conversas'); return true; });
+  if(isAdmin()||isSocia()){tabs.push(['financeiro','Financeiro',ICON.money]);}
   if(isAdmin()){tabs.push(['meta','Meta',ICON.target]);tabs.push(['equipe','Equipe',ICON.crown]);}
   const nav=document.getElementById('nav'); nav.innerHTML='';
   tabs.forEach(([k,l,ic])=>{
@@ -560,8 +565,9 @@ function render(){
   stopAlkeAudio();
   const v=document.getElementById('view'); v.innerHTML='';
   // se o usuário não pode ver a aba atual, cai no Meu dia
-  if((S.tab==='funil'&&!canTab('funil'))||(S.tab==='servicos'&&!canTab('servicos'))||(S.tab==='conversas'&&!canTab('conversas'))||((S.tab==='meta'||S.tab==='equipe')&&!isAdmin())) S.tab='meudia';
+  if((S.tab==='funil'&&!canTab('funil'))||(S.tab==='servicos'&&!canTab('servicos'))||(S.tab==='conversas'&&!canTab('conversas'))||((S.tab==='meta'||S.tab==='equipe')&&!isAdmin())||(S.tab==='financeiro'&&!(isAdmin()||isSocia()))) S.tab='meudia';
   if(S.tab==='meudia') v.appendChild(viewMeuDia());
+  else if(S.tab==='financeiro') v.appendChild(viewFinanceiro());
   else if(S.tab==='funil') v.appendChild(viewFunil());
   else if(S.tab==='agenda') v.appendChild(viewAgenda());
   else if(S.tab==='clientes') v.appendChild(viewClientes());
@@ -1007,12 +1013,66 @@ function resumo(proId){
   const custo=v.reduce((s,a)=>s+(custoAt(a)||0),0);
   return {fat,custo,n:v.length,ticket:v.length?fat/v.length:0};
 }
+// FINANCEIRO — resumo por mês do que cada profissional (não-sócia) tem a receber + marcar pago
+function viewFinanceiro(){
+  const w=EL('div'); w.appendChild(pageHead('Financeiro','A pagar às profissionais'));
+  if(!S.finMes) S.finMes=new Date().toISOString().slice(0,7);
+  let [yy,mm]=S.finMes.split('-').map(Number);
+  const shift=(d)=>{ let y=yy,m=mm+d; if(m<1){m=12;y--;} if(m>12){m=1;y++;} S.finMes=y+'-'+String(m).padStart(2,'0'); render(); };
+  const bar=EL('div');bar.style.cssText='display:flex;align-items:center;justify-content:center;gap:12px;margin:12px 0 4px';
+  const prev=EL('button','btn ghost sm','‹');prev.onclick=()=>shift(-1);
+  const next=EL('button','btn ghost sm','›');next.onclick=()=>shift(1);
+  const lbl=EL('div');lbl.style.cssText='font-weight:700;font-size:16px;min-width:170px;text-align:center;text-transform:capitalize';
+  lbl.textContent=new Date(yy,mm-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  bar.appendChild(prev);bar.appendChild(lbl);bar.appendChild(next);w.appendChild(bar);
+  const pros=S.pros.filter(p=>p.presta_servico!==false && !p.socia && !p.admin);
+  let totDevido=0,totPago=0;
+  const rows=pros.map(p=>{
+    const pct=pctPro(p); let bruto=0;
+    S.agendamentos.forEach(a=>{ if(a.status==='realizado'&&a.profissional_id===p.id&&(a.realizado_em||a.inicio||'').slice(0,7)===S.finMes){ bruto+=valorAt(a)||0; } });
+    const recolhido=bruto*pct/100, dela=bruto-recolhido;
+    const rep=(S.repasses||[]).find(r=>r.profissional_id===p.id && r.mes===S.finMes);
+    const pago=!!(rep&&rep.pago);
+    if(pago) totPago+=dela; else totDevido+=dela;
+    return {p,pct,bruto,recolhido,dela,pago};
+  });
+  const sum=EL('div','grid');
+  sum.appendChild(tile('A pagar (pendente)',fmt(totDevido),'neg'));
+  sum.appendChild(tile('Já pago no mês',fmt(totPago),'pos'));
+  w.appendChild(sum);
+  if(!rows.length){ w.appendChild(Object.assign(EL('div','panel'),{textContent:'Nenhuma profissional (não-sócia) cadastrada. Só as que recebem % aparecem aqui.'})); return w; }
+  rows.forEach(({p,pct,bruto,recolhido,dela,pago})=>{
+    const pan=EL('div','panel');pan.style.marginTop='14px';
+    const hd=EL('div');hd.style.cssText='display:flex;align-items:center;gap:11px';
+    const ini=(p.nome||'?').trim(); const av=EL('div');av.style.cssText='width:38px;height:38px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;background:'+(p.cor||'#A8823A');av.textContent=ini?ini[0].toUpperCase():'?';
+    hd.appendChild(av);hd.appendChild(Object.assign(EL('div'),{textContent:p.nome,style:'font-weight:700;font-size:16px;flex:1'}));
+    pan.appendChild(hd);
+    const grid=EL('div');grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px;margin-top:12px';
+    const cell=(lb,vl,strong)=>{const d=EL('div');d.style.cssText='background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:11px 12px';d.appendChild(Object.assign(EL('div','muted'),{textContent:lb,style:'font-size:11.5px'}));d.appendChild(Object.assign(EL('div'),{textContent:vl,style:'font-weight:800;margin-top:3px;font-size:'+(strong?'18px':'15px')+(strong?';color:var(--gold)':'')}));return d;};
+    grid.appendChild(cell('Bruto (fez)',fmt(bruto)));
+    grid.appendChild(cell('% recolhida',pct+'%'));
+    grid.appendChild(cell('Recolhido (studio)',fmt(recolhido)));
+    grid.appendChild(cell('Fica pra ela',fmt(dela),true));
+    pan.appendChild(grid);
+    const foot=EL('div');foot.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:13px;flex-wrap:wrap';
+    const tag=EL('span');tag.textContent=pago?'✓ Pago':'Pendente';tag.style.cssText='font-size:12.5px;font-weight:700;'+(pago?'color:var(--win)':'color:var(--warn)');
+    foot.appendChild(tag);
+    const btn=EL('button',pago?'btn ghost sm':'btn sm',pago?'Desmarcar pago':'Marcar como pago');
+    btn.onclick=async()=>{ btn.disabled=true;btn.textContent='…'; const novo=!pago; try{ await sb.from('repasses').upsert({profissional_id:p.id,mes:S.finMes,pago:novo,valor:dela,pago_em:novo?new Date().toISOString():null},{onConflict:'profissional_id,mes'}); }catch(e){ alert('Não consegui salvar agora.'); } await loadAll(); render(); };
+    foot.appendChild(btn);
+    pan.appendChild(foot);
+    w.appendChild(pan);
+  });
+  w.appendChild(Object.assign(EL('div'),{style:'height:40px'}));
+  return w;
+}
 function viewPainel(){
   const w=EL('div'); w.appendChild(pageHead('Dashboard', S.me.nome));
   w.appendChild(rangeBar());
   if(isAdmin()||isSocia()){
-    S.dashPro = S.dashPro||null;
-    if(S.dashPro && !canMoney(S.dashPro)) S.dashPro=null; // sócia não abre o dashboard da outra sócia
+    // sócia abre na visão DELA; lá em cima escolhe Geral (empresa) ou outra profissional. Admin abre no Geral.
+    if(S.dashPro===undefined){ S.dashPro = (isSocia()&&!isAdmin()) ? S.me.id : null; }
+    if(S.dashPro && !canMoney(S.dashPro)) S.dashPro=null;
     // seletor: Geral ou a visão de uma profissional (só as que você pode ver)
     const chips=EL('div','rangebar'); chips.style.marginTop='6px';
     const mk=(label,val)=>{const b=EL('button','qk'+(S.dashPro===val?' on':''),label);b.onclick=()=>{S.dashPro=val;render()};return b};
@@ -2297,8 +2357,28 @@ function loginModal(p,mode){
     const {data,error}=await sb.functions.invoke('admin-users',{body});
     const err=(data&&data.error)||(error&&error.message);
     if(err){msg.textContent='Erro: '+err;msg.style.color='var(--alert)';save.textContent='Salvar';return;}
-    msg.textContent=mode==='create'?'Login criado ✓':'Senha trocada ✓';msg.style.color='var(--win)';
-    await loadAll(); setTimeout(()=>{ov.remove();render()},1000);
+    await loadAll();
+    if(mode==='create'){
+      // mostra as credenciais prontas pra copiar e mandar pra profissional
+      const link='https://alkebeautystudio-hub.github.io/alke-studio/';
+      const mailv=email.value.trim(), senhav=pw.value;
+      m.innerHTML='';
+      m.appendChild(EL('h3',null,'Login criado ✓'));
+      m.appendChild(Object.assign(EL('p','muted'),{style:'margin:2px 0 12px;font-size:13px',textContent:'Copie e mande pra '+(p.nome||'ela')+'.'}));
+      const card=EL('div');card.style.cssText='background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:14px;font-size:14px;line-height:1.9;word-break:break-all';
+      const line=(ic,lb,vl)=>{const d=EL('div');d.innerHTML=ic+' <b>'+lb+'</b> ';const s=document.createElement('span');s.textContent=vl;d.appendChild(s);return d;};
+      card.appendChild(line('🔗','Link:',link));card.appendChild(line('📧','E-mail:',mailv));card.appendChild(line('🔑','Senha:',senhav));
+      m.appendChild(card);
+      const msgTxt='Oi '+(p.nome||'')+'! Seu acesso ao sistema ALKE 💆\n\n🔗 Link: '+link+'\n📧 E-mail: '+mailv+'\n🔑 Senha: '+senhav+'\n\nÉ só abrir o link e entrar com esse e-mail e senha.';
+      const act2=EL('div','mactions');act2.style.marginTop='14px';
+      const cp=EL('button','btn','Copiar mensagem pronta');
+      cp.onclick=async()=>{ try{ await navigator.clipboard.writeText(msgTxt); cp.textContent='Copiado ✓'; }catch(_){ const t=document.createElement('textarea');t.value=msgTxt;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.focus();t.select();try{document.execCommand('copy');cp.textContent='Copiado ✓';}catch(e){cp.textContent='Copie à mão';}document.body.removeChild(t);} setTimeout(()=>{cp.textContent='Copiar mensagem pronta';},1600); };
+      const done=EL('button','btn ghost','Fechar');done.onclick=()=>{ov.remove();render();};
+      act2.appendChild(cp);act2.appendChild(done);m.appendChild(act2);
+      return;
+    }
+    msg.textContent='Senha trocada ✓';msg.style.color='var(--win)';
+    setTimeout(()=>{ov.remove();render()},1000);
   };
   act.appendChild(cancel);act.appendChild(save);m.appendChild(act);
   const ov=overlay(m); (mode==='create'?email:pw).focus();
