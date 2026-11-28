@@ -1015,7 +1015,8 @@ const clientesDistintas=v=>new Set(v.map(a=>a.lead_id||a.cliente_id||a.cliente_t
 function resumo(proId){
   const v=vendasMes(proId); const fat=v.reduce((s,a)=>s+(valorAt(a)||0),0);
   const custo=v.reduce((s,a)=>s+(custoAt(a)||0),0);
-  return {fat,custo,n:v.length,ticket:v.length?fat/v.length:0,clientes:clientesDistintas(v)};
+  const clientes=clientesDistintas(v);
+  return {fat,custo,n:v.length,clientes,ticket:clientes?fat/clientes:0}; // ticket médio POR PESSOA (fat ÷ clientes distintas)
 }
 // taxas de comparecimento/falta no período (do filtro de datas de cima)
 function taxas(proId){
@@ -1163,7 +1164,7 @@ function viewPainel(){
     g.appendChild(tile('Seu faturamento',fmt(net)));
     g.appendChild(tile('Clientes atendidas',String(r.clientes)));
     g.appendChild(tile('Realizados',String(r.n)));
-    g.appendChild(tile('Ticket médio',fmt(r.n?net/r.n:0)));
+    g.appendChild(tile('Ticket médio',fmt(r.clientes?net/r.clientes:0)));
     const tx=taxas(S.me.id);
     g.appendChild(tile('Agendados',String(tx.ag)));
     g.appendChild(tile('Comparecimento',tx.base?tx.comp+'%':'—','pos'));
