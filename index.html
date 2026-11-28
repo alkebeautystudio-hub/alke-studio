@@ -13,11 +13,16 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <script>if('serviceWorker' in navigator){addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}
-// auto-atualiza quando reabrir o app: compara o ETag do index.html e recarrega se mudou
-(function(){var u=location.pathname,tag=null;
+// auto-atualiza quando reabrir o app: compara o ETag do index.html e recarrega se mudou —
+// mas NUNCA no meio de uma digitação/card aberto: espera a pessoa terminar pra não perder o que ela faz.
+(function(){var u=location.pathname,tag=null,pending=false;
  function get(cb){fetch(u,{cache:'no-store',method:'HEAD'}).then(function(r){cb(r.headers.get('etag')||r.headers.get('last-modified'))}).catch(function(){cb(null)})}
  get(function(t){tag=t});
- document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'&&tag){ get(function(t){ if(t&&t!==tag){ location.reload(); } }); } });
+ function busy(){ try{ if(document.querySelector('.ov'))return true; var a=document.activeElement; if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT'))return true; }catch(e){} return false; }
+ function tryReload(){ if(pending&&!busy()) location.reload(); }
+ document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'&&tag){ get(function(t){ if(t&&t!==tag){ pending=true; tryReload(); } }); } });
+ document.addEventListener('focusout',function(){ setTimeout(tryReload,500); });
+ setInterval(tryReload,5000);
 })();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -373,15 +378,16 @@ async function boot(){
   await loadAll(); renderShell(); render();
   setupGlobalRealtime();
 }
+// está "ocupada": modal aberto, campo em foco (digitando) ou dentro de uma conversa — não redesenhar por cima
+function appBusy(){ try{ if(document.querySelector('.ov'))return true; const a=document.activeElement; if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT'))return true; }catch(e){} return (S.tab==='conversas'&&S.convSel); }
 // TEMPO REAL GLOBAL: qualquer mudança no banco (lead novo, cadastro preenchido, agendamento, serviço…) atualiza a tela sozinha
 let _rtChan=null, _rtT=null;
 function setupGlobalRealtime(){
   if(_rtChan){ try{sb.removeChannel(_rtChan);}catch(_){} _rtChan=null; }
   const reload=()=>{ clearTimeout(_rtT); _rtT=setTimeout(async()=>{
     await loadAll();
-    // não re-renderiza por cima de um modal aberto (form) nem da conversa aberta (tem tempo real próprio)
-    const busy = document.querySelector('.ov') || (S.tab==='conversas' && S.convSel);
-    if(!busy){ try{ render(); renderShell(); }catch(_){} }
+    // não re-renderiza por cima de um modal/digitação nem da conversa aberta (tem tempo real próprio)
+    if(!appBusy()){ try{ render(); renderShell(); }catch(_){} }
   }, 600); };
   try{
     _rtChan=sb.channel('alke-global-rt')
@@ -391,7 +397,7 @@ function setupGlobalRealtime(){
       .on('postgres_changes',{event:'*',schema:'public',table:'servicos'},reload)
       .on('postgres_changes',{event:'*',schema:'public',table:'despesas'},reload)
       .on('postgres_changes',{event:'*',schema:'public',table:'repasses'},reload)
-      .on('postgres_changes',{event:'*',schema:'public',table:'profissionais'},async()=>{ await refreshMe(); if(!document.querySelector('.ov')){ try{ renderShell(); render(); }catch(_){} } reload(); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'profissionais'},async()=>{ await refreshMe(); if(!appBusy()){ try{ renderShell(); render(); }catch(_){} } reload(); })
       .subscribe();
   }catch(_){}
 }
@@ -408,8 +414,7 @@ async function resyncTudo(){
   setupGlobalRealtime();                 // reconecta os canais de tempo real (podem ter morrido na queda)
   await loadAll();                        // puxa card, funil, conversas, financeiro… tudo fresco
   try{ if(typeof window._alkeThreadReload==='function') await window._alkeThreadReload(); }catch(_){} // conversa aberta recarrega
-  const busy = document.querySelector('.ov') || (S.tab==='conversas' && S.convSel);
-  if(!busy){ try{ render(); renderShell(); }catch(_){} }
+  if(!appBusy()){ try{ render(); renderShell(); }catch(_){} }
   else { try{ renderShell(); }catch(_){} } // ao menos os contadores/avisos no topo
 }
 function agendarResync(){ clearTimeout(_resyncT); _resyncT=setTimeout(resyncTudo,250); }
