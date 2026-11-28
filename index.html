@@ -1799,10 +1799,10 @@ async function enviarLinkCadastro(leadId, inicioISO){
   const tel=l.telefone.replace(/\D/g,''); if(tel.length<10) return;
   const prim=(l.nome||'').split(' ')[0]||'';
   const link='https://alkebeautystudio-hub.github.io/alke-studio/cadastro.html?tel=55'+tel.replace(/^55/,'')+(prim?('&nome='+encodeURIComponent(prim)):'');
-  let quando=''; try{ if(inicioISO){ const dt=new Date(inicioISO); quando=brDate(inicioISO,{weekday:'long',day:'2-digit',month:'2-digit'})+' às '+hhmm(dt); } }catch(_){}
+  let quando=''; try{ if(inicioISO){ const dt=new Date(inicioISO); if(!isNaN(dt.getTime())){ quando=dt.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'})+' às '+hhmm(dt); } } }catch(_){}
   const msg = quando
-    ? ('Oi'+(prim?' '+prim:'')+'! 💛 Seu horário ficou marcado para '+quando+'. Pra deixar tudo certinho e garantir condições exclusivas do nosso estúdio, completa seu cadastro rapidinho aqui: '+link)
-    : ('Oi'+(prim?' '+prim:'')+'! 💛 Pra deixar seu atendimento certinho e garantir condições exclusivas do nosso estúdio, completa seu cadastro rapidinho aqui: '+link);
+    ? ('Seu horário está agendado para '+quando+'. 💛\n\nPara concluir e garantir as condições exclusivas do nosso estúdio, é só preencher seu cadastro rapidinho neste link:\n'+link)
+    : ('Para deixar seu atendimento certinho e garantir as condições exclusivas do nosso estúdio, é só preencher seu cadastro rapidinho neste link:\n'+link);
   const r=await fzapCall('send',{phone:tel,body:msg});
   if(r&&r.ok){ await sb.from('leads').update({link_cadastro_em:new Date().toISOString()}).eq('id',leadId); }
 }
@@ -1839,6 +1839,15 @@ async function prepareImage(file){
 }
 async function resolveMedia(mm){ if(mm.midia_url)return stripBucket(mm.midia_url); if(!mm.wa_id)return null; const r=await fzapCall('media',{id:mm.wa_id}); if(r&&r.url){mm.midia_url=r.url;return stripBucket(r.url);} return null; }
 // monta a mídia dentro da bolha. io = IntersectionObserver pra carregar imagem só quando aparece
+// transforma links (http/https) do texto em <a> clicável, mantendo o resto como texto
+function linkify(text){
+  const frag=document.createDocumentFragment(); const s=String(text||''); const re=/(https?:\/\/[^\s]+)/g; let last=0,m;
+  while((m=re.exec(s))){ if(m.index>last) frag.appendChild(document.createTextNode(s.slice(last,m.index)));
+    const a=document.createElement('a');a.href=m[0];a.target='_blank';a.rel='noopener';a.textContent=m[0];a.style.cssText='color:#1b74e4;text-decoration:underline;word-break:break-all';
+    frag.appendChild(a); last=m.index+m[0].length; }
+  if(last<s.length) frag.appendChild(document.createTextNode(s.slice(last)));
+  return frag;
+}
 function buildMedia(mm,io){
   const tp=mm.tipo, img=(tp==='image'||tp==='sticker'), size=tp==='sticker'?120:200;
   const wrap=EL('div');
@@ -1907,8 +1916,8 @@ async function threadView(telefone, opts){
     (data||[]).filter(mm=>!mm.oculta).forEach(mm=>{ const b=EL('div');const mine=mm.direcao==='out';const apagada=mm.apagada||mm.tipo==='deleted';
       b.style.cssText='position:relative;max-width:76%;padding:8px 11px;border-radius:12px;font-size:14px;white-space:pre-wrap;word-break:break-word;'+(mine?'align-self:flex-end;background:color-mix(in srgb,var(--gold) 22%,var(--surface))':'align-self:flex-start;background:var(--surface);border:1px solid var(--line)');
       if(apagada){ const di=EL('div');di.textContent='🚫 Mensagem apagada';di.style.cssText='font-style:italic;color:var(--muted)';b.appendChild(di); }
-      else if(MIDIAS.includes(mm.tipo)){ b.appendChild(buildMedia(mm,io)); if(mm.texto&&mm.texto[0]!=='['&&mm.tipo!=='document'&&mm.tipo!=='doc'){ b.appendChild(Object.assign(EL('div'),{textContent:mm.texto,style:'margin-top:4px'})); } }
-      else { const ml=midiaLabel(mm.tipo,mm.texto); if(ml){const mi=EL('div');mi.textContent=ml;mi.style.cssText='font-style:italic;color:var(--muted)';b.appendChild(mi);} else b.appendChild(document.createTextNode(mm.texto||'')); }
+      else if(MIDIAS.includes(mm.tipo)){ b.appendChild(buildMedia(mm,io)); if(mm.texto&&mm.texto[0]!=='['&&mm.tipo!=='document'&&mm.tipo!=='doc'){ const cap=EL('div');cap.style.marginTop='4px';cap.appendChild(linkify(mm.texto));b.appendChild(cap); } }
+      else { const ml=midiaLabel(mm.tipo,mm.texto); if(ml){const mi=EL('div');mi.textContent=ml;mi.style.cssText='font-style:italic;color:var(--muted)';b.appendChild(mi);} else b.appendChild(linkify(mm.texto||'')); }
       const tm=EL('div');tm.style.cssText='font-size:10px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:3px;justify-content:flex-end';
       tm.appendChild(document.createTextNode((mine&&mm.enviado_por?mm.enviado_por+' · ':'')+(mm.criado_em?hhmm(new Date(mm.criado_em)):'')));
       if(mine&&!apagada){ const st=mm.status||1; const tk=EL('span');tk.textContent=(st>=2?'✓✓':'✓');tk.style.cssText='font-size:11px;font-weight:700;'+(st>=3?'color:#34B7F1':'color:var(--muted)');tk.title=(st>=3?'Lida':st>=2?'Entregue':'Enviada');tm.appendChild(tk); }
