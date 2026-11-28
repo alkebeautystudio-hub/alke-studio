@@ -1011,10 +1011,11 @@ function mesesNoRange(){const set=new Set();let [y,m]=S.dashFrom.slice(0,7).spli
 function vendasMes(proId){
   return S.agendamentos.filter(a=>a.status==='realizado' && valorAt(a)!=null && inRange(a.realizado_em||a.inicio) && (!proId||a.profissional_id===proId));
 }
+const clientesDistintas=v=>new Set(v.map(a=>a.lead_id||a.cliente_id||a.cliente_telefone||a.id)).size;
 function resumo(proId){
   const v=vendasMes(proId); const fat=v.reduce((s,a)=>s+(valorAt(a)||0),0);
   const custo=v.reduce((s,a)=>s+(custoAt(a)||0),0);
-  return {fat,custo,n:v.length,ticket:v.length?fat/v.length:0};
+  return {fat,custo,n:v.length,ticket:v.length?fat/v.length:0,clientes:clientesDistintas(v)};
 }
 // taxas de comparecimento/falta no período (do filtro de datas de cima)
 function taxas(proId){
@@ -1097,7 +1098,8 @@ function viewPainel(){
       const pro=proById(S.dashPro); const r=resumo(S.dashPro); const naoSocia=!pro.socia; const pct=pctPro(pro);
       const g=EL('div','grid');
       g.appendChild(tile('Faturamento (real)',fmt(r.fat)));
-      g.appendChild(tile('Atendimentos',String(r.n)));
+      g.appendChild(tile('Clientes atendidas',String(r.clientes)));
+      g.appendChild(tile('Realizados',String(r.n)));
       g.appendChild(tile('Ticket médio',fmt(r.ticket)));
       if(naoSocia){
         g.appendChild(tile('Líquido dela ('+(100-pct)+'%)',fmt(r.fat*(1-pct/100)),'pos'));
@@ -1120,7 +1122,8 @@ function viewPainel(){
     const cx=caixa();
     const g=EL('div','grid');
     g.appendChild(tile('Faturamento do studio',fmt(fatT)));
-    g.appendChild(tile('Atendimentos',String(vendasMes().length)));
+    g.appendChild(tile('Clientes atendidas',String(clientesDistintas(vendasMes()))));
+    g.appendChild(tile('Realizados',String(vendasMes().length)));
     g.appendChild(tile('Caixa do studio',fmt(cx.saldo),cx.saldo>=0?'pos':'neg'));
     const txG=taxas(null);
     g.appendChild(tile('Agendados',String(txG.ag)));
@@ -1148,7 +1151,8 @@ function viewPainel(){
   const g=EL('div','grid');
   if(S.me.socia){
     g.appendChild(tile('Faturamento',fmt(r.fat)));
-    g.appendChild(tile('Atendimentos',String(r.n)));
+    g.appendChild(tile('Clientes atendidas',String(r.clientes)));
+    g.appendChild(tile('Realizados',String(r.n)));
     g.appendChild(tile('Ticket médio',fmt(r.ticket)));
     g.appendChild(tile('Lucro',fmt(r.fat-r.custo+caixa().saldo/2),'pos'));
     w.appendChild(g);
@@ -1157,7 +1161,8 @@ function viewPainel(){
   } else {
     const net=r.fat*(1-pctPro(S.me)/100);
     g.appendChild(tile('Seu faturamento',fmt(net)));
-    g.appendChild(tile('Atendimentos',String(r.n)));
+    g.appendChild(tile('Clientes atendidas',String(r.clientes)));
+    g.appendChild(tile('Realizados',String(r.n)));
     g.appendChild(tile('Ticket médio',fmt(r.n?net/r.n:0)));
     const tx=taxas(S.me.id);
     g.appendChild(tile('Agendados',String(tx.ag)));
