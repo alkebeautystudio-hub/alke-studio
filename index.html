@@ -450,6 +450,10 @@ const canMoney=proId=>{ if(isAdmin()||isSocia())return true; if(S.me.id===proId)
 const canPreco=()=>isAdmin()||isSocia();            // quem vê/edita preço e custo do catálogo
 const pctPro=p=>{const v=Number((p||{}).percentual);return isNaN(v)?30:v};
 const permOf=(p,key)=>{const pm=(p&&p.permissoes)||{}; if(key==='funil')return pm.funil!==false; return !!pm[key];};
+// telefone canônico p/ dedup: ignora país (55) e o 9º dígito → casa manual x WhatsApp. Ex: 31997970600 e 5531997970600 → 3197970600
+function canonTel(t){ let d=String(t||'').replace(/\D/g,''); if(d.startsWith('55')&&d.length>=12) d=d.slice(2); const ddd=d.slice(0,2); let num=d.slice(2); if(num.length===9&&num[0]==='9') num=num.slice(1); return ddd+num.slice(-8); }
+// acha um lead existente pelo número (qualquer formato). Retorna o lead ou null.
+function leadByTel(tel){ const k=canonTel(tel); if(!k||k.length<9)return null; return (S.leads||[]).find(l=>l.telefone&&canonTel(l.telefone)===k)||null; }
 const canTab=key=>{ if(isAdmin()||isSocia())return true; if(key==='funil')return permOf(S.me,'funil'); if(key==='conversas')return permOf(S.me,'conversas'); if(key==='servicos')return permOf(S.me,'servicos'); return true; };
 // valor que o usuário atual PODE ver: sócia/admin veem bruto; profissional vê o líquido dela (já com a % descontada)
 const valorMostra=a=>{const v=valorAt(a); if(v==null)return null; if(isAdmin()||isSocia())return v; return v*(1-pctPro(S.me)/100);};
@@ -937,9 +941,8 @@ function openEditarCliente(id,prefill){
     if(id){ await sb.from('leads').update(data).eq('id',id); }
     else {
       data.etapa='lead';
-      const key=(tel.value||'').replace(/\D/g,'');
-      const ex = key && S.leads.find(x=>x.telefone && x.telefone.replace(/\D/g,'')===key);
-      if(ex){ tid=ex.id; await sb.from('leads').update(data).eq('id',ex.id); }
+      const ex = tel.value.trim() && leadByTel(tel.value); // junta se já existir esse número (manual ou do WhatsApp)
+      if(ex){ tid=ex.id; delete data.etapa; if(ex.telefone && ex.telefone.replace(/\D/g,'').length>=12) delete data.telefone; await sb.from('leads').update(data).eq('id',ex.id); }
       else { data.criado_em=new Date().toISOString(); const {data:ins}=await sb.from('leads').insert(data).select().single(); tid=ins&&ins.id; }
     }
     ov.remove(); await loadAll(); if(tid) await recomputeEtapa(tid); await loadAll(); render();
@@ -1496,8 +1499,7 @@ function openAgendamento(ag,prefill){
     // todo serviço pertence a um card de cliente — acha ou cria (sem duplicar)
     let leadId = prefill.lead_id || (isEdit?ag.lead_id:null);
     if(!leadId){
-      const key=(tel.value||'').replace(/\D/g,'');
-      let ex = key && S.leads.find(x=>x.telefone && x.telefone.replace(/\D/g,'')===key);
+      let ex = tel.value.trim() && leadByTel(tel.value); // junta pelo número (manual ou WhatsApp), sem duplicar
       if(!ex && nome.value.trim()) ex = S.leads.find(x=>(x.nome||'').trim().toLowerCase()===nome.value.trim().toLowerCase());
       if(ex) leadId=ex.id;
       else{const {data:ins}=await sb.from('leads').insert({nome:nome.value.trim()||'Cliente',telefone:tel.value.trim()||null,etapa:'agendada',criado_em:new Date().toISOString(),atualizado_em:new Date().toISOString()}).select().single();leadId=ins?.id;}
