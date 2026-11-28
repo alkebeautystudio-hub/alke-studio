@@ -391,16 +391,20 @@ function setupGlobalRealtime(){
       .on('postgres_changes',{event:'*',schema:'public',table:'servicos'},reload)
       .on('postgres_changes',{event:'*',schema:'public',table:'despesas'},reload)
       .on('postgres_changes',{event:'*',schema:'public',table:'repasses'},reload)
+      .on('postgres_changes',{event:'*',schema:'public',table:'profissionais'},async()=>{ await refreshMe(); if(!document.querySelector('.ov')){ try{ renderShell(); render(); }catch(_){} } reload(); })
       .subscribe();
   }catch(_){}
 }
 // ATUALIZAÇÃO GERAL: ao abrir/voltar pro app ou quando a internet volta, puxa tudo de novo
 // (cobre o tempo em que o app ficou fechado ou a net caiu; enquanto aberto, o tempo real acima cuida)
 let _resyncT=null;
+// recarrega "quem sou eu" (permissões, papel, %) — pra mudança do ADM refletir na hora na conta dela
+async function refreshMe(){ try{ const {data:{session}}=await sb.auth.getSession(); if(!session)return false; const {data:me}=await sb.from('profissionais').select('*').eq('user_id',session.user.id).maybeSingle(); if(me){ S.me=me; return true; } }catch(_){} return false; }
 async function checkKill(){ try{ const {data:{session}}=await sb.auth.getSession(); if(!session)return; const {data:me}=await sb.from('profissionais').select('sessao_min').eq('user_id',session.user.id).maybeSingle(); if(me&&me.sessao_min){ const iat=JSON.parse(atob(session.access_token.split('.')[1])).iat*1000; if(iat<new Date(me.sessao_min).getTime()){ await sb.auth.signOut(); location.reload(); } } }catch(_){} }
 async function resyncTudo(){
   try{ const {data:{session}}=await sb.auth.getSession(); if(!session)return; }catch(_){ return; }
   checkKill();                           // se o ADM deslogou/trocou senha dela, sai fora
+  await refreshMe();                     // atualiza permissões/papel dela (o ADM pode ter mudado)
   setupGlobalRealtime();                 // reconecta os canais de tempo real (podem ter morrido na queda)
   await loadAll();                        // puxa card, funil, conversas, financeiro… tudo fresco
   try{ if(typeof window._alkeThreadReload==='function') await window._alkeThreadReload(); }catch(_){} // conversa aberta recarrega
