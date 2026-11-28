@@ -1792,17 +1792,23 @@ async function fzapCall(action,extra){ try{ const {data}=await sb.functions.invo
 function temCadastroBasico(l){ const nomeOk=l.nome && !/^Cliente \d{4}$/.test(l.nome) && l.nome.trim().length>=2; return !!(nomeOk && l.telefone && l.nascimento); }
 async function enviarLinkCadastro(leadId, inicioISO){
   const l=S.leads.find(x=>x.id===leadId); if(!l||!l.telefone) return;
-  // só manda pra quem AINDA não tem cadastro básico (Nome + número + data de nascimento)
-  if(l.cadastro_completo || temCadastroBasico(l)) return;
   // evita re-enviar no mesmo dia (se agendar vários serviços juntos)
   if(l.link_cadastro_em && (Date.now()-new Date(l.link_cadastro_em).getTime()) < 20*3600*1000) return;
   const tel=l.telefone.replace(/\D/g,''); if(tel.length<10) return;
-  const prim=(l.nome||'').split(' ')[0]||'';
-  const link='https://alkebeautystudio-hub.github.io/alke-studio/cadastro.html?tel=55'+tel.replace(/^55/,'')+(prim?('&nome='+encodeURIComponent(prim)):'');
   let quando=''; try{ if(inicioISO){ const dt=new Date(inicioISO); if(!isNaN(dt.getTime())){ quando=dt.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'})+' às '+hhmm(dt); } } }catch(_){}
-  const msg = quando
-    ? ('Seu horário está agendado para '+quando+'. 💛\n\nPara concluir e garantir as condições exclusivas do nosso estúdio, é só preencher seu cadastro rapidinho neste link:\n'+link)
-    : ('Para deixar seu atendimento certinho e garantir as condições exclusivas do nosso estúdio, é só preencher seu cadastro rapidinho neste link:\n'+link);
+  const temCad = l.cadastro_completo || temCadastroBasico(l);
+  let msg;
+  if(temCad){
+    // JÁ tem cadastro: só confirma o horário, sem link
+    if(!quando) return; // sem data não precisa confirmar
+    msg = 'Seu horário está agendado para '+quando+'. 💛';
+  } else {
+    // AINDA não tem cadastro: manda o link (toda vez que agendar, até preencher)
+    const link='https://alkebeautystudio-hub.github.io/alke-studio/cadastro.html?tel=55'+tel.replace(/^55/,'');
+    msg = quando
+      ? ('Seu horário está agendado para '+quando+'.\n\nPara concluir e garantir as condições exclusivas do nosso estúdio, preencha aqui:\n'+link)
+      : ('Para deixar seu atendimento certinho e garantir as condições exclusivas do nosso estúdio, é só preencher seu cadastro rapidinho neste link:\n'+link);
+  }
   const r=await fzapCall('send',{phone:tel,body:msg});
   if(r&&r.ok){ await sb.from('leads').update({link_cadastro_em:new Date().toISOString()}).eq('id',leadId); }
 }
