@@ -447,7 +447,9 @@ const isAdmin=()=>!!S.me.admin;
 const isSocia=()=>!!S.me.socia;
 // admin vê tudo; cada um vê o seu; sócia vê também as NÃO-sócias, mas NÃO a outra sócia
 const canMoney=proId=>{ if(isAdmin()||isSocia())return true; if(S.me.id===proId)return true; return false; };
-const canPreco=()=>isAdmin()||isSocia();            // quem vê/edita preço e custo do catálogo
+const canPreco=()=>isAdmin()||isSocia();            // admin/sócia: vê/edita preço de TODAS
+const canServOwn=()=>!canPreco()&&permOf(S.me,'servicos'); // profissional com permissão: mexe só nos DELA
+const canServ=s=>canPreco()||(canServOwn()&&s&&s.profissional_id===S.me.id); // pode ver/editar preço deste serviço
 const pctPro=p=>{const v=Number((p||{}).percentual);return isNaN(v)?30:v};
 const permOf=(p,key)=>{const pm=(p&&p.permissoes)||{}; if(key==='funil')return pm.funil!==false; return !!pm[key];};
 // telefone canônico p/ dedup: ignora país (55) e o 9º dígito → casa manual x WhatsApp. Ex: 31997970600 e 5531997970600 → 3197970600
@@ -954,13 +956,14 @@ function openEditarCliente(id,prefill){
 // ---------- SERVIÇOS ----------
 function viewServicos(){
   const w=EL('div'); const t=pageHead('Serviços');
-  if(canPreco()){const add=EL('button','btn','+ Serviço');add.style.marginLeft='auto';add.onclick=()=>openServ(null);t.appendChild(add);}
+  if(canPreco()||canServOwn()){const add=EL('button','btn','+ Serviço');add.style.marginLeft='auto';add.onclick=()=>openServ(null);t.appendChild(add);}
   w.appendChild(t);
-  w.appendChild(EL('p','muted','Admin e sócias cadastram os serviços e definem custo e preço de todas as profissionais.'));
-  // agrupa por profissional
-  S.pros.filter(p=>p.presta_servico!==false).forEach(pro=>{
+  w.appendChild(EL('p','muted',canPreco()?'Admin e sócias cadastram os serviços e definem custo e preço de todas as profissionais.':'Seus serviços e preços. Você pode editar e adicionar os seus.'));
+  // agrupa por profissional — profissional comum vê só os dela
+  const prosList = canPreco() ? S.pros.filter(p=>p.presta_servico!==false) : S.pros.filter(p=>p.id===S.me.id);
+  prosList.forEach(pro=>{
     const list=S.servicos.filter(s=>s.profissional_id===pro.id);
-    if(!list.length && !canPreco()) return;
+    if(!list.length && !(canPreco()||canServOwn())) return;
     const pan=EL('div','panel');
     const head=EL('div','listhead'); const hn=EL('div');
     const dot=EL('span','dot');dot.style.background=pro.cor;dot.style.marginRight='8px';
@@ -969,7 +972,7 @@ function viewServicos(){
     if(!list.length) pan.appendChild(EL('div','muted','Nenhum serviço ainda.'));
     list.forEach(s=>{
       const price=S.precos[s.id]||{};
-      const canSee=canPreco();
+      const canSee=canServ(s);
       const row=EL('div','srow');
       row.appendChild(EL('span','nm',s.nome));
       row.appendChild(EL('span','muted',(s.tempo_min||0)+' min'));
@@ -985,15 +988,17 @@ function viewServicos(){
   return w;
 }
 function openServ(id){
-  if(!canPreco()) return; // só admin + sócias definem serviços/preços
+  if(!(canPreco()||canServOwn())) return; // admin/sócia (todas) ou profissional (só as dela)
   const s = id ? {...S.servicos.find(x=>x.id===id)} : {nome:'',profissional_id:S.me.id,tempo_min:30};
+  if(id && !canServ(s)) return; // profissional não edita serviço de outra
   const price = id ? (S.precos[id]||{custo:0,preco:0}) : {custo:0,preco:0};
   const m=EL('div','modal'); m.appendChild(EL('h3',null,id?'Serviço':'Novo serviço'));
   const nome=inp('text',s.nome);
   const proOpts=S.pros.filter(p=>p.presta_servico!==false).map(p=>[p.id,p.nome]);
   const pro=sel(proOpts, s.profissional_id); // admin e sócias escolhem a profissional
   const tempo=inp('number',s.tempo_min); const custo=inp('number',price.custo); const preco=inp('number',price.preco);
-  m.appendChild(field('Nome do serviço',nome)); m.appendChild(field('Profissional',pro));
+  m.appendChild(field('Nome do serviço',nome));
+  if(canPreco()) m.appendChild(field('Profissional',pro)); // profissional comum só mexe nos dela
   const two=EL('div','two'); two.appendChild(field('Tempo (min)',tempo)); two.appendChild(field('Custo',custo)); m.appendChild(two);
   m.appendChild(field('Preço',preco));
   const act=EL('div','mactions');
@@ -1001,7 +1006,7 @@ function openServ(id){
   const cancel=EL('button','btn ghost','Cancelar');cancel.onclick=()=>ov.remove();
   const save=EL('button','btn','Salvar');
   save.onclick=async()=>{
-    const d={nome:nome.value.trim(),profissional_id:pro.value,tempo_min:Number(tempo.value)||0};
+    const d={nome:nome.value.trim(),profissional_id:canPreco()?pro.value:S.me.id,tempo_min:Number(tempo.value)||0};
     let sid=id;
     if(id) await sb.from('servicos').update(d).eq('id',id);
     else{const {data:ins}=await sb.from('servicos').insert(d).select().single();sid=ins?.id;}
