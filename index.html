@@ -1016,6 +1016,17 @@ function resumo(proId){
   const custo=v.reduce((s,a)=>s+(custoAt(a)||0),0);
   return {fat,custo,n:v.length,ticket:v.length?fat/v.length:0};
 }
+// taxas de comparecimento/falta no período (do filtro de datas de cima)
+function taxas(proId){
+  let ag=0,re=0,fa=0;
+  S.agendamentos.forEach(a=>{ if(proId && a.profissional_id!==proId) return;
+    if(a.status==='realizado' && inRange(a.realizado_em||a.inicio)){re++;ag++;}
+    else if(a.status==='faltou' && inRange(a.inicio)){fa++;ag++;}
+    else if(a.status==='marcado' && inRange(a.inicio)){ag++;}
+  });
+  const base=re+fa;
+  return {ag,re,fa,comp:base?Math.round(re/base*100):0,falta:base?Math.round(fa/base*100):0,base};
+}
 // FINANCEIRO — resumo por mês do que cada profissional (não-sócia) tem a receber + marcar pago
 function viewFinanceiro(){
   const w=EL('div'); w.appendChild(pageHead('Financeiro','A pagar às profissionais'));
@@ -1096,6 +1107,10 @@ function viewPainel(){
         g.appendChild(tile('Custo material',fmt(r.custo),'neg'));
         g.appendChild(tile('Lucro (fat − custo)',fmt(r.fat-r.custo),'pos'));
       }
+      const tx=taxas(S.dashPro);
+      g.appendChild(tile('Agendados',String(tx.ag)));
+      g.appendChild(tile('Comparecimento',tx.base?tx.comp+'%':'—','pos'));
+      g.appendChild(tile('Faltas',tx.fa+(tx.base?' · '+tx.falta+'%':''),'neg'));
       w.appendChild(g);
       w.appendChild(historicoPanel(S.dashPro,{bruto:true,pct:naoSocia?pct:0}));
       return w;
@@ -1107,6 +1122,10 @@ function viewPainel(){
     g.appendChild(tile('Faturamento do studio',fmt(fatT)));
     g.appendChild(tile('Atendimentos',String(vendasMes().length)));
     g.appendChild(tile('Caixa do studio',fmt(cx.saldo),cx.saldo>=0?'pos':'neg'));
+    const txG=taxas(null);
+    g.appendChild(tile('Agendados',String(txG.ag)));
+    g.appendChild(tile('Comparecimento',txG.base?txG.comp+'%':'—','pos'));
+    g.appendChild(tile('Faltas',txG.fa+(txG.base?' · '+txG.falta+'%':''),'neg'));
     w.appendChild(g);
     const pan=EL('div','panel'); pan.appendChild(EL('h3',null,'Por profissional'));
     pan.appendChild(Object.assign(EL('p','muted'),{style:'margin-top:-4px;font-size:12.5px',textContent:'Toque numa profissional pra ver tudo dela em detalhe.'}));
@@ -1140,6 +1159,10 @@ function viewPainel(){
     g.appendChild(tile('Seu faturamento',fmt(net)));
     g.appendChild(tile('Atendimentos',String(r.n)));
     g.appendChild(tile('Ticket médio',fmt(r.n?net/r.n:0)));
+    const tx=taxas(S.me.id);
+    g.appendChild(tile('Agendados',String(tx.ag)));
+    g.appendChild(tile('Comparecimento',tx.base?tx.comp+'%':'—','pos'));
+    g.appendChild(tile('Faltas',tx.fa+(tx.base?' · '+tx.falta+'%':''),'neg'));
     w.appendChild(g);
     w.appendChild(historicoPanel(S.me.id,{clean:true}));
   }
